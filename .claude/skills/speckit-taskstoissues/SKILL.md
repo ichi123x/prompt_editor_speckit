@@ -17,21 +17,21 @@ disable-model-invocation: false
 $ARGUMENTS
 ```
 
-You **MUST** consider the user input before proceeding (if not empty).
+ユーザー入力がある場合は、それを検討してから進めなければなりません。
 
-## Pre-Execution Checks
+## Pre-Execution Checks（事前実行チェック）
 
-**Check for extension hooks (before tasks-to-issues conversion)**:
-- Check if `.specify/extensions.yml` exists in the project root.
-- If it exists, read it and look for entries under the `hooks.before_taskstoissues` key
-- If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
-- Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.
-- For each remaining hook, do **not** attempt to interpret or evaluate hook `condition` expressions:
-  - If the hook has no `condition` field, or it is null/empty, treat the hook as executable
-  - If the hook defines a non-empty `condition`, skip the hook and leave condition evaluation to the HookExecutor implementation
-- When constructing command invocations from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `/speckit-git-commit`.
-- For each executable hook, output the following based on its `optional` flag:
-  - **Optional hook** (`optional: true`):
+**拡張フックの確認（tasks-to-issues変換の前）**:
+- プロジェクトルートに `.specify/extensions.yml` が存在するか確認する。
+- 存在する場合は読み込み、`hooks.before_taskstoissues` キー配下のエントリを探す
+- YAMLの解析に失敗する場合や不正な場合は、フックのチェックを黙ってスキップし、通常通り続行する
+- `enabled` が明示的に `false` であるフックは除外する。`enabled` フィールドがないフックはデフォルトで有効として扱う
+- 残りの各フックについて、フックの `condition` 式を解釈・評価しようとしては**いけない**:
+  - フックに `condition` フィールドがない、またはそれが null/空である場合、そのフックは実行可能として扱う
+  - フックが空でない `condition` を定義している場合、そのフックはスキップし、条件の評価は HookExecutor の実装に委ねる
+- フックコマンド名からコマンド呼び出しを構築する際は、ドット（`.`）をハイフン（`-`）に置き換える。例: `speckit.git.commit` → `/speckit-git-commit`。
+- 実行可能な各フックについて、`optional` フラグに基づいて以下を出力する:
+  - **オプションフック** (`optional: true`):
     ```
     ## Extension Hooks
 
@@ -42,7 +42,7 @@ You **MUST** consider the user input before proceeding (if not empty).
     Prompt: {prompt}
     To execute: `/{command}`
     ```
-  - **Mandatory hook** (`optional: false`):
+  - **必須フック** (`optional: false`):
     ```
     ## Extension Hooks
 
@@ -50,46 +50,46 @@ You **MUST** consider the user input before proceeding (if not empty).
     Executing: `/{command}`
     EXECUTE_COMMAND: {command}
 
-    Wait for the result of the hook command before proceeding to the Outline.
+    Outline に進む前にフックコマンドの結果を待つこと。
     ```
-    After emitting the block above you MUST actually invoke the hook and wait for it to finish before continuing. Run it the same way you would run the command yourself in this agent/session (the invocation may differ from the literal `{command}` id shown above, e.g. a skills-mode agent runs it as `/skill:speckit-...` or `$speckit-...`). Emitting the block alone does not run the hook.
-- If no hooks are registered or `.specify/extensions.yml` does not exist, skip silently
+    上のブロックを出力した後、実際にそのフックを呼び出し、完了を待ってから続行しなければなりません。このエージェント/セッションで自分自身がコマンドを実行するのと同じ方法で実行してください（呼び出し方法は上記の文字通りの `{command}` id とは異なる場合があります。例えばスキルモードのエージェントでは `/skill:speckit-...` や `$speckit-...` として実行されます）。上記のブロックを出力するだけではフックは実行されません。
+- フックが登録されていない、または `.specify/extensions.yml` が存在しない場合は、黙ってスキップする
 
 ## Outline
 
-1. Run `.specify/scripts/powershell/check-prerequisites.ps1 -Json -RequireTasks -IncludeTasks` from repo root and parse FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
-1. **IF EXISTS**: Load `.specify/memory/constitution.md` for project principles and governance constraints.
-1. From the executed script, extract the path to **tasks**.
-1. Get the Git remote by running:
+1. リポジトリのルートから `.specify/scripts/powershell/check-prerequisites.ps1 -Json -RequireTasks -IncludeTasks` を実行し、FEATURE_DIR と AVAILABLE_DOCS のリストをパースする。すべてのパスは絶対パスでなければならない。"I'm Groot" のような引数中のシングルクォートには、エスケープ構文を使用すること: 例 'I'\''m Groot'（可能であればダブルクォートを使用: "I'm Groot"）。
+1. **存在する場合**: プロジェクトの原則とガバナンス制約について `.specify/memory/constitution.md` をロードする。
+1. 実行したスクリプトから、**tasks** へのパスを抽出する。
+1. 以下を実行してGitリモートを取得する:
 
 ```bash
 git config --get remote.origin.url
 ```
 
 > [!CAUTION]
-> ONLY PROCEED TO NEXT STEPS IF THE REMOTE IS A GITHUB URL
+> リモートがGitHubのURLである場合にのみ、次のステップに進んでください
 
-1. **Fetch existing issues for deduplication**: Before creating anything, build the set of task IDs you are about to process from `tasks.md` (each is a `T` followed by **at least** three digits, e.g. `T001` — `/speckit-converge` assigns new IDs with `T{M+1:03d}`, which is a floor rather than a cap, so once a file has more than 999 tasks the IDs are four digits or longer). Then use the GitHub MCP server's `list_issues` tool to look for issues that already cover those IDs. Do not pass a `state` value, since omitting it makes the tool return both open and closed issues. Request `perPage: 100` to keep the number of calls down, and since the tool uses cursor-based pagination, request pages with the `after` parameter (using the `endCursor` from the previous response). For each issue title, match it against the task ID pattern `\bT\d{3,}\b` (the `{3,}` accepts four-digit and longer IDs — with `\d{3}` a title containing `T1000` would not match at all, because the trailing `\b` cannot fall between two digits, so that task would be silently neither deduplicated nor created; word boundaries still stop a token like `ST001` from matching, and force the whole digit run to be consumed so `T100` can never match inside `T1000`; this also recognises titles written as `T001 ...`, `T001: ...` or `[T001] ...`) and, when it matches one of your task IDs, mark that ID as already having an issue. Stop paginating as soon as every task ID has been matched, or when there are no more pages, so you do not keep fetching the whole repository's issue history once all task IDs are accounted for. This bounds the number of calls on repos with large issue histories and still prevents duplicates when the command is re-run after `tasks.md` is regenerated or the skill is re-invoked.
-1. For each task in the list, use the GitHub MCP server to create a new issue in the repository that is representative of the Git remote. Task lines in `tasks.md` start with a markdown checkbox, so first strip the leading `- [ ]` (and any `[P]` / `[US#]` markers) to recover the task ID and its description. Create the issue with a single canonical title of the form `T001: <description>`, with the ID written once followed by the task description (for example, the line `- [ ] T001 Create project structure` becomes the title `T001: Create project structure`).
-   - **Skip** any task whose ID is already present in the set of existing issues from the previous step, and report it (for example, `T001 already has an issue, skipping`).
-   - Only create issues for tasks that do not yet have a matching issue.
+1. **重複排除のために既存のissueを取得する**: 何かを作成する前に、`tasks.md` から処理しようとしているタスクIDの集合を構築する（各IDは `T` に続いて**少なくとも**3桁の数字、例: `T001` — `/speckit-converge` は `T{M+1:03d}` で新しいIDを割り当てるが、これは上限ではなく下限なので、1つのファイルに1000件を超えるタスクがあるとIDは4桁以上になる）。次にGitHub MCPサーバーの `list_issues` ツールを使って、それらのIDをすでにカバーしているissueを探す。`state` の値は渡さないこと。省略することでツールがオープンとクローズ両方のissueを返すようになる。呼び出し回数を抑えるため `perPage: 100` を要求し、このツールはカーソルベースのページネーションを使うため、（前回レスポンスの `endCursor` を使って）`after` パラメータでページを要求する。各issueのタイトルについて、タスクIDのパターン `\bT\d{3,}\b` と照合する（`{3,}` は4桁以上のIDも受け入れる — `\d{3}` のままだと、末尾の `\b` が2つの数字の間には成立しないため、`T1000` を含むタイトルはまったくマッチせず、そのタスクは重複排除もされず作成もされないまま黙って見逃されてしまう。単語境界は依然として `ST001` のようなトークンがマッチするのを防ぎ、数字の並び全体を消費させることで `T100` が `T1000` の内部にマッチすることも決してない。これは `T001 ...`、`T001: ...`、`[T001] ...` のように書かれたタイトルも認識する）。マッチした場合、そのIDにはすでにissueがあるものとしてマークする。すべてのタスクIDがマッチしたら、あるいはそれ以上ページがなくなったら、ページネーションを止める。これにより、すべてのタスクIDが判明した後もリポジトリ全体のissue履歴を取得し続けることがなくなる。これによりissue履歴の多いリポジトリでの呼び出し回数が制限され、`tasks.md` が再生成されたりスキルが再度呼び出されたりした後にコマンドが再実行された場合でも重複が防止される。
+1. リスト内の各タスクについて、GitHub MCPサーバーを使い、Gitリモートに対応するリポジトリに新しいissueを作成する。`tasks.md` 内のタスク行はMarkdownのチェックボックスで始まるため、まず先頭の `- [ ]`（および `[P]` / `[US#]` マーカー）を取り除いてタスクIDと説明を復元する。issueは `T001: <description>` という単一の正規のタイトル形式で作成し、IDを一度だけ書いた後にタスクの説明を続ける（例えば `- [ ] T001 Create project structure` という行は、タイトル `T001: Create project structure` になる）。
+   - 前のステップで既存issueの集合にすでにIDが存在するタスクは**スキップ**し、それを報告する（例: `T001 already has an issue, skipping`）。
+   - まだ対応するissueがないタスクについてのみissueを作成する。
 
 > [!CAUTION]
-> UNDER NO CIRCUMSTANCES EVER CREATE ISSUES IN REPOSITORIES THAT DO NOT MATCH THE REMOTE URL
+> リモートURLと一致しないリポジトリにissueを作成することは、いかなる状況においても絶対に行わないでください
 
-## Post-Execution Checks
+## Post-Execution Checks（事後実行チェック）
 
-**Check for extension hooks (after tasks-to-issues conversion)**:
-Check if `.specify/extensions.yml` exists in the project root.
-- If it exists, read it and look for entries under the `hooks.after_taskstoissues` key
-- If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
-- Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.
-- For each remaining hook, do **not** attempt to interpret or evaluate hook `condition` expressions:
-  - If the hook has no `condition` field, or it is null/empty, treat the hook as executable
-  - If the hook defines a non-empty `condition`, skip the hook and leave condition evaluation to the HookExecutor implementation
-- When constructing command invocations from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `/speckit-git-commit`.
-- For each executable hook, output the following based on its `optional` flag:
-  - **Optional hook** (`optional: true`):
+**拡張フックの確認（tasks-to-issues変換の後）**:
+プロジェクトルートに `.specify/extensions.yml` が存在するか確認する。
+- 存在する場合は読み込み、`hooks.after_taskstoissues` キー配下のエントリを探す
+- YAMLの解析に失敗する場合や不正な場合は、フックのチェックを黙ってスキップし、通常通り続行する
+- `enabled` が明示的に `false` であるフックは除外する。`enabled` フィールドがないフックはデフォルトで有効として扱う
+- 残りの各フックについて、フックの `condition` 式を解釈・評価しようとしては**いけない**:
+  - フックに `condition` フィールドがない、またはそれが null/空である場合、そのフックは実行可能として扱う
+  - フックが空でない `condition` を定義している場合、そのフックはスキップし、条件の評価は HookExecutor の実装に委ねる
+- フックコマンド名からコマンド呼び出しを構築する際は、ドット（`.`）をハイフン（`-`）に置き換える。例: `speckit.git.commit` → `/speckit-git-commit`。
+- 実行可能な各フックについて、`optional` フラグに基づいて以下を出力する:
+  - **オプションフック** (`optional: true`):
     ```
     ## Extension Hooks
 
@@ -100,7 +100,7 @@ Check if `.specify/extensions.yml` exists in the project root.
     Prompt: {prompt}
     To execute: `/{command}`
     ```
-  - **Mandatory hook** (`optional: false`):
+  - **必須フック** (`optional: false`):
     ```
     ## Extension Hooks
 
@@ -108,5 +108,5 @@ Check if `.specify/extensions.yml` exists in the project root.
     Executing: `/{command}`
     EXECUTE_COMMAND: {command}
     ```
-    After emitting the block above you MUST actually invoke the hook and wait for it to finish before continuing. Run it the same way you would run the command yourself in this agent/session (the invocation may differ from the literal `{command}` id shown above, e.g. a skills-mode agent runs it as `/skill:speckit-...` or `$speckit-...`). Emitting the block alone does not run the hook.
-- If no hooks are registered or `.specify/extensions.yml` does not exist, skip silently
+    上のブロックを出力した後、実際にそのフックを呼び出し、完了を待ってから続行しなければなりません。このエージェント/セッションで自分自身がコマンドを実行するのと同じ方法で実行してください（呼び出し方法は上記の文字通りの `{command}` id とは異なる場合があります。例えばスキルモードのエージェントでは `/skill:speckit-...` や `$speckit-...` として実行されます）。上記のブロックを出力するだけではフックは実行されません。
+- フックが登録されていない、または `.specify/extensions.yml` が存在しない場合は、黙ってスキップする

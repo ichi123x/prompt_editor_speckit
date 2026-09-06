@@ -17,21 +17,21 @@ disable-model-invocation: false
 $ARGUMENTS
 ```
 
-You **MUST** consider the user input before proceeding (if not empty).
+ユーザー入力がある場合は、それを検討してから進めなければなりません。
 
-## Pre-Execution Checks
+## Pre-Execution Checks（事前実行チェック）
 
-**Check for extension hooks (before planning)**:
-- Check if `.specify/extensions.yml` exists in the project root.
-- If it exists, read it and look for entries under the `hooks.before_plan` key
-- If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
-- Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.
-- For each remaining hook, do **not** attempt to interpret or evaluate hook `condition` expressions:
-  - If the hook has no `condition` field, or it is null/empty, treat the hook as executable
-  - If the hook defines a non-empty `condition`, skip the hook and leave condition evaluation to the HookExecutor implementation
-- When constructing command invocations from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `/speckit-git-commit`.
-- For each executable hook, output the following based on its `optional` flag:
-  - **Optional hook** (`optional: true`):
+**拡張フックの確認（プランニングの前）**:
+- プロジェクトルートに `.specify/extensions.yml` が存在するか確認する。
+- 存在する場合は読み込み、`hooks.before_plan` キー配下のエントリを探す
+- YAMLの解析に失敗する場合や不正な場合は、フックのチェックを黙ってスキップし、通常通り続行する
+- `enabled` が明示的に `false` であるフックは除外する。`enabled` フィールドがないフックはデフォルトで有効として扱う
+- 残りの各フックについて、フックの `condition` 式を解釈・評価しようとしては**いけない**:
+  - フックに `condition` フィールドがない、またはそれが null/空である場合、そのフックは実行可能として扱う
+  - フックが空でない `condition` を定義している場合、そのフックはスキップし、条件の評価は HookExecutor の実装に委ねる
+- フックコマンド名からコマンド呼び出しを構築する際は、ドット（`.`）をハイフン（`-`）に置き換える。例: `speckit.git.commit` → `/speckit-git-commit`。
+- 実行可能な各フックについて、`optional` フラグに基づいて以下を出力する:
+  - **オプションフック** (`optional: true`):
     ```
     ## Extension Hooks
 
@@ -42,7 +42,7 @@ You **MUST** consider the user input before proceeding (if not empty).
     Prompt: {prompt}
     To execute: `/{command}`
     ```
-  - **Mandatory hook** (`optional: false`):
+  - **必須フック** (`optional: false`):
     ```
     ## Extension Hooks
 
@@ -50,40 +50,40 @@ You **MUST** consider the user input before proceeding (if not empty).
     Executing: `/{command}`
     EXECUTE_COMMAND: {command}
 
-    Wait for the result of the hook command before proceeding to the Outline.
+    Outline に進む前にフックコマンドの結果を待つこと。
     ```
-    After emitting the block above you MUST actually invoke the hook and wait for it to finish before continuing. Run it the same way you would run the command yourself in this agent/session (the invocation may differ from the literal `{command}` id shown above, e.g. a skills-mode agent runs it as `/skill:speckit-...` or `$speckit-...`). Emitting the block alone does not run the hook.
-- If no hooks are registered or `.specify/extensions.yml` does not exist, skip silently
+    上のブロックを出力した後、実際にそのフックを呼び出し、完了を待ってから続行しなければなりません。このエージェント/セッションで自分自身がコマンドを実行するのと同じ方法で実行してください（呼び出し方法は上記の文字通りの `{command}` id とは異なる場合があります。例えばスキルモードのエージェントでは `/skill:speckit-...` や `$speckit-...` として実行されます）。上記のブロックを出力するだけではフックは実行されません。
+- フックが登録されていない、または `.specify/extensions.yml` が存在しない場合は、黙ってスキップする
 
 ## Outline
 
-1. **Setup**: Run `.specify/scripts/powershell/setup-plan.ps1 -Json` from repo root and parse JSON for FEATURE_SPEC, IMPL_PLAN, SPECS_DIR, BRANCH. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
+1. **セットアップ**: リポジトリのルートから `.specify/scripts/powershell/setup-plan.ps1 -Json` を実行し、FEATURE_SPEC、IMPL_PLAN、SPECS_DIR、BRANCH のJSONをパースする。"I'm Groot" のような引数中のシングルクォートには、エスケープ構文を使用すること: 例 'I'\''m Groot'（可能であればダブルクォートを使用: "I'm Groot"）。
 
-2. **Load context**: Read FEATURE_SPEC and `.specify/memory/constitution.md`. Load IMPL_PLAN template (already copied).
+2. **コンテキストのロード**: FEATURE_SPEC と `.specify/memory/constitution.md` を読む。IMPL_PLAN テンプレート（すでにコピー済み）をロードする。
 
-3. **Execute plan workflow**: Follow the structure in IMPL_PLAN template to:
-   - Fill Technical Context (mark unknowns as "NEEDS CLARIFICATION")
-   - Fill Constitution Check section from constitution
-   - Evaluate gates (ERROR if violations unjustified)
-   - Phase 0: Generate research.md (resolve all NEEDS CLARIFICATION)
-   - Phase 1: Generate data-model.md, contracts/, quickstart.md
-   - Re-evaluate Constitution Check post-design
+3. **プランワークフローの実行**: IMPL_PLAN テンプレートの構造に従って以下を行う:
+   - Technical Context を記入する（不明点は「NEEDS CLARIFICATION」とマークする）
+   - 憲法から Constitution Check セクションを記入する
+   - ゲートを評価する（正当化されない違反があればERROR）
+   - Phase 0: research.md を生成する（すべてのNEEDS CLARIFICATIONを解決する）
+   - Phase 1: data-model.md、contracts/、quickstart.md を生成する
+   - 設計後にConstitution Checkを再評価する
 
-## Mandatory Post-Execution Hooks
+## Mandatory Post-Execution Hooks（必須の事後実行フック）
 
-**You MUST complete this section before reporting completion to the user.**
+**ユーザーに完了を報告する前に、このセクションを完了しなければなりません。**
 
-Check if `.specify/extensions.yml` exists in the project root.
-- If it does not exist, or no hooks are registered under `hooks.after_plan`, skip to the Completion Report.
-- If it exists, read it and look for entries under the `hooks.after_plan` key.
-- If the YAML cannot be parsed or is invalid, skip hook checking silently and continue to the Completion Report.
-- Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.
-- For each remaining hook, do **not** attempt to interpret or evaluate hook `condition` expressions:
-  - If the hook has no `condition` field, or it is null/empty, treat the hook as executable
-  - If the hook defines a non-empty `condition`, skip the hook and leave condition evaluation to the HookExecutor implementation
-- When constructing command invocations from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `/speckit-git-commit`.
-- For each executable hook, output the following based on its `optional` flag:
-  - **Mandatory hook** (`optional: false`) — **You MUST emit `EXECUTE_COMMAND:` for each mandatory hook**:
+プロジェクトルートに `.specify/extensions.yml` が存在するか確認する。
+- 存在しない場合、または `hooks.after_plan` の下にフックが登録されていない場合は、Completion Report にスキップする。
+- 存在する場合は読み込み、`hooks.after_plan` キー配下のエントリを探す。
+- YAMLの解析に失敗する場合や不正な場合は、フックのチェックを黙ってスキップし、Completion Report に進む。
+- `enabled` が明示的に `false` であるフックは除外する。`enabled` フィールドがないフックはデフォルトで有効として扱う。
+- 残りの各フックについて、フックの `condition` 式を解釈・評価しようとしては**いけない**:
+  - フックに `condition` フィールドがない、またはそれが null/空である場合、そのフックは実行可能として扱う
+  - フックが空でない `condition` を定義している場合、そのフックはスキップし、条件の評価は HookExecutor の実装に委ねる
+- フックコマンド名からコマンド呼び出しを構築する際は、ドット（`.`）をハイフン（`-`）に置き換える。例: `speckit.git.commit` → `/speckit-git-commit`。
+- 実行可能な各フックについて、`optional` フラグに基づいて以下を出力する:
+  - **必須フック** (`optional: false`) — **必須フックごとに `EXECUTE_COMMAND:` を出力しなければならない**:
     ```
     ## Extension Hooks
 
@@ -91,8 +91,8 @@ Check if `.specify/extensions.yml` exists in the project root.
     Executing: `/{command}`
     EXECUTE_COMMAND: {command}
     ```
-    After emitting the block above you MUST actually invoke the hook and wait for it to finish before continuing. Run it the same way you would run the command yourself in this agent/session (the invocation may differ from the literal `{command}` id shown above, e.g. a skills-mode agent runs it as `/skill:speckit-...` or `$speckit-...`). Emitting the block alone does not run the hook.
-  - **Optional hook** (`optional: true`):
+    上のブロックを出力した後、実際にそのフックを呼び出し、完了を待ってから続行しなければなりません。このエージェント/セッションで自分自身がコマンドを実行するのと同じ方法で実行してください（呼び出し方法は上記の文字通りの `{command}` id とは異なる場合があります。例えばスキルモードのエージェントでは `/skill:speckit-...` や `$speckit-...` として実行されます）。上記のブロックを出力するだけではフックは実行されません。
+  - **オプションフック** (`optional: true`):
     ```
     ## Extension Hooks
 
@@ -106,64 +106,64 @@ Check if `.specify/extensions.yml` exists in the project root.
 
 ## Completion Report
 
-Command ends after Phase 1 design. Report branch, IMPL_PLAN path, and generated artifacts.
+コマンドはPhase 1のデザインの後に終了する。ブランチ、IMPL_PLANのパス、生成された成果物を報告する。
 
 ## Phases
 
 ### Phase 0: Outline & Research
 
-1. **Extract unknowns from Technical Context** above:
-   - For each NEEDS CLARIFICATION → research task
-   - For each dependency → best practices task
-   - For each integration → patterns task
+1. **上記の Technical Context から不明点を抽出する**:
+   - NEEDS CLARIFICATION ごとに → リサーチタスク
+   - 依存関係ごとに → ベストプラクティスタスク
+   - 統合ごとに → パターンタスク
 
-2. **Generate and dispatch research agents**:
+2. **リサーチエージェントを生成・派遣する**:
 
    ```text
-   For each unknown in Technical Context:
-     Task: "Research {unknown} for {feature context}"
-   For each technology choice:
-     Task: "Find best practices for {tech} in {domain}"
+   Technical Context の各不明点について:
+     Task: "{feature context} 向けに {unknown} をリサーチする"
+   各技術選定について:
+     Task: "{domain} における {tech} のベストプラクティスを見つける"
    ```
 
-3. **Consolidate findings** in `research.md` using format:
-   - Decision: [what was chosen]
-   - Rationale: [why chosen]
-   - Alternatives considered: [what else evaluated]
+3. **所見を以下の形式で `research.md` に統合する**:
+   - Decision（決定）: [何が選択されたか]
+   - Rationale（理由）: [なぜ選択されたか]
+   - Alternatives considered（検討した代替案）: [他に何が評価されたか]
 
-**Output**: research.md with all NEEDS CLARIFICATION resolved
+**Output**: すべてのNEEDS CLARIFICATIONが解決された research.md
 
 ### Phase 1: Design & Contracts
 
-**Prerequisites:** `research.md` complete
+**前提条件:** `research.md` が完了していること
 
-1. **Extract entities from feature spec** → `data-model.md`:
-   - Entity name, fields, relationships
-   - Validation rules from requirements
-   - State transitions if applicable
+1. **フィーチャーspecからエンティティを抽出する** → `data-model.md`:
+   - エンティティ名、フィールド、関係
+   - 要件からのバリデーションルール
+   - 該当する場合は状態遷移
 
-2. **Define interface contracts** (if project has external interfaces) → `/contracts/`:
-   - Identify what interfaces the project exposes to users or other systems
-   - Document the contract format appropriate for the project type
-   - Examples: public APIs for libraries, command schemas for CLI tools, endpoints for web services, grammars for parsers, UI contracts for applications
-   - Skip if project is purely internal (build scripts, one-off tools, etc.)
+2. **インターフェースコントラクトを定義する**（プロジェクトに外部インターフェースがある場合） → `/contracts/`:
+   - プロジェクトがユーザーや他システムに公開しているインターフェースを特定する
+   - プロジェクトタイプに適したコントラクト形式を文書化する
+   - 例: ライブラリの場合は公開API、CLIツールの場合はコマンドスキーマ、Webサービスの場合はエンドポイント、パーサーの場合は文法、アプリケーションの場合はUIコントラクト
+   - プロジェクトが純粋に内部向け（ビルドスクリプト、単発ツールなど）の場合はスキップする
 
-3. **Create quickstart validation guide** → `quickstart.md`:
-   - Document runnable validation scenarios that prove the feature works end-to-end
-   - Include prerequisites, setup commands, test/run commands, and expected outcomes
-   - Use links or references to contracts and data model details instead of duplicating them
-   - Do not include full implementation code, model/service/controller bodies, migrations, or complete test suites
-   - Keep this artifact as a validation/run guide; implementation details belong in `tasks.md` and the implementation phase
+3. **クイックスタート検証ガイドを作成する** → `quickstart.md`:
+   - フィーチャーがエンドツーエンドで動作することを証明する、実行可能な検証シナリオを文書化する
+   - 前提条件、セットアップコマンド、テスト/実行コマンド、期待される結果を含める
+   - コントラクトやデータモデルの詳細を複製するのではなく、リンクや参照を使用する
+   - 完全な実装コード、モデル/サービス/コントローラの本体、マイグレーション、完全なテストスイートは含めない
+   - この成果物は検証/実行ガイドとして維持すること。実装の詳細は tasks.md と実装フェーズに属する
 
-**Output**: data-model.md, /contracts/*, quickstart.md
+**Output**: data-model.md、/contracts/*、quickstart.md
 
-## Key rules
+## Key rules（主要なルール）
 
-- Use absolute paths for filesystem operations; use project-relative paths for references in documentation
-- ERROR on gate failures or unresolved clarifications
+- ファイルシステム操作には絶対パスを、ドキュメント内の参照にはプロジェクト相対パスを使用する
+- ゲートの失敗や未解決の明確化事項があればERRORとする
 
 ## Done When
 
-- [ ] Plan workflow executed and design artifacts generated
-- [ ] Extension hooks dispatched or skipped according to the rules in Mandatory Post-Execution Hooks above
-- [ ] Completion reported to user with branch, plan path, and generated artifacts
+- [ ] プランワークフローが実行され、設計成果物が生成されている
+- [ ] 上記の Mandatory Post-Execution Hooks のルールに従って拡張フックが発行またはスキップされている
+- [ ] ブランチ、planのパス、生成された成果物とともに、完了がユーザーに報告されている

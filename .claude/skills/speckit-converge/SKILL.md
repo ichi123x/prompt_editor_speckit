@@ -16,22 +16,22 @@ disable-model-invocation: false
 $ARGUMENTS
 ```
 
-You **MUST** consider the user input before proceeding (if not empty).
+ユーザー入力がある場合は、それを検討してから進めなければなりません。
 
-## Pre-Execution Checks
+## Pre-Execution Checks（事前実行チェック）
 
-**Check for extension hooks (before convergence)**:
+**拡張フックの確認（収束の前）**:
 
-- Check if `.specify/extensions.yml` exists in the project root.
-- If it exists, read it and look for entries under the `hooks.before_converge` key
-- If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
-- Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.
-- For each remaining hook, do **not** attempt to interpret or evaluate hook `condition` expressions:
-  - If the hook has no `condition` field, or it is null/empty, treat the hook as executable
-  - If the hook defines a non-empty `condition`, skip the hook and leave condition evaluation to the HookExecutor implementation
-- When constructing command invocations from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `/speckit-git-commit`.
-- For each executable hook, output the following based on its `optional` flag:
-  - **Optional hook** (`optional: true`):
+- プロジェクトルートに `.specify/extensions.yml` が存在するか確認する。
+- 存在する場合は読み込み、`hooks.before_converge` キー配下のエントリを探す
+- YAMLの解析に失敗する場合や不正な場合は、フックのチェックを黙ってスキップし、通常通り続行する
+- `enabled` が明示的に `false` であるフックは除外する。`enabled` フィールドがないフックはデフォルトで有効として扱う
+- 残りの各フックについて、フックの `condition` 式を解釈・評価しようとしては**いけない**:
+  - フックに `condition` フィールドがない、またはそれが null/空である場合、そのフックは実行可能として扱う
+  - フックが空でない `condition` を定義している場合、そのフックはスキップし、条件の評価は HookExecutor の実装に委ねる
+- フックコマンド名からコマンド呼び出しを構築する際は、ドット（`.`）をハイフン（`-`）に置き換える。例: `speckit.git.commit` → `/speckit-git-commit`。
+- 実行可能な各フックについて、`optional` フラグに基づいて以下を出力する:
+  - **オプションフック** (`optional: true`):
 
     ```text
     ## Extension Hooks
@@ -44,7 +44,7 @@ You **MUST** consider the user input before proceeding (if not empty).
     To execute: `/{command}`
     ```
 
-  - **Mandatory hook** (`optional: false`):
+  - **必須フック** (`optional: false`):
 
     ```text
     ## Extension Hooks
@@ -53,206 +53,165 @@ You **MUST** consider the user input before proceeding (if not empty).
     Executing: `/{command}`
     EXECUTE_COMMAND: {command}
 
-    Wait for the result of the hook command before proceeding to the Goal.
+    Goal に進む前にフックコマンドの結果を待つこと。
     ```
-    After emitting the block above you MUST actually invoke the hook and wait for it to finish before continuing. Run it the same way you would run the command yourself in this agent/session (the invocation may differ from the literal `{command}` id shown above, e.g. a skills-mode agent runs it as `/skill:speckit-...` or `$speckit-...`). Emitting the block alone does not run the hook.
+    上のブロックを出力した後、実際にそのフックを呼び出し、完了を待ってから続行しなければなりません。このエージェント/セッションで自分自身がコマンドを実行するのと同じ方法で実行してください（呼び出し方法は上記の文字通りの `{command}` id とは異なる場合があります。例えばスキルモードのエージェントでは `/skill:speckit-...` や `$speckit-...` として実行されます）。上記のブロックを出力するだけではフックは実行されません。
 
-- If no hooks are registered or `.specify/extensions.yml` does not exist, skip silently
+- フックが登録されていない、または `.specify/extensions.yml` が存在しない場合は、黙ってスキップする
 
-## Goal
+## Goal（目的）
 
-Close the gap between what a feature's specification, plan, and tasks call for and what the
-codebase currently implements. Read `spec.md`, `plan.md`, and `tasks.md` as the **sole
-source of intent** (with the constitution as governing constraints), assess the current
-state of the code, determine which requirements, acceptance criteria, plan decisions, and
-existing tasks are unmet, incomplete, or only partially satisfied, and **append each piece
-of remaining work as a new, traceable task** at the bottom of `tasks.md` so that
-`/speckit-implement` can complete it. This command MUST run only after
-`/speckit-implement` has run on the current `tasks.md`, and after `/speckit-tasks` has produced a complete `tasks.md`.
+フィーチャーのspec・plan・tasksが要求する内容と、コードベースが現在実装している内容とのギャップを埋める。`spec.md`、`plan.md`、`tasks.md` を**唯一の意図の情報源**として読み込み（憲法を統治的な制約として扱う）、コードの現状を評価し、どの要件・受け入れ基準・plan上の決定・既存タスクが未達・未完了・部分的にしか満たされていないかを判断し、残っている作業をそれぞれ `tasks.md` の末尾に**新しいトレーサブルなタスクとして追加**し、`/speckit-implement` がそれを完了できるようにする。このコマンドは、現在の `tasks.md` に対して `/speckit-implement` が実行された後、かつ `/speckit-tasks` が完全な `tasks.md` を生成した後にのみ実行しなければならない。
 
-This is **not** a diff tool and does **not** track changes. It assesses the present state
-of the code relative to the feature's artifacts — no git, no branch comparison, no history.
+これは差分ツールでは**なく**、変更履歴を追跡することも**ない**。フィーチャーの成果物に対するコードの現在の状態を評価するものであり、gitもブランチ比較も履歴も使わない。
 
-## Operating Constraints
+## Operating Constraints（運用上の制約）
 
-**APPEND-ONLY, NEVER REWRITE**: The command's **only** write is appending a new
-`## Phase N: Convergence` section to `tasks.md`. It MUST NOT:
+**追記のみ、書き直しは絶対にしない**: このコマンドの唯一の書き込みは、`tasks.md` に新しい `## Phase N: Convergence` セクションを追記することです。以下を行っては**いけません**:
 
-- modify `spec.md` or `plan.md` in any way;
-- rewrite, renumber, reorder, or delete any existing task (including tasks from a prior
-  Convergence phase);
-- modify, create, or delete any application code — completing the appended tasks is the
-  job of `/speckit-implement`.
+- `spec.md` や `plan.md` をいかなる形でも変更すること
+- 既存のタスク（以前の Convergence フェーズのタスクを含む）を書き直す、番号を振り直す、並べ替える、削除すること
+- アプリケーションコードを変更・作成・削除すること — 追記されたタスクを完了させるのは `/speckit-implement` の仕事です。
 
-When the codebase already satisfies everything, the command MUST leave `tasks.md`
-**byte-for-byte unchanged** (no empty Convergence header) and report a clean result.
+コードベードがすでにすべてを満たしている場合、このコマンドは `tasks.md` を**1バイトも変更せず**（空のConvergence見出しも作らない）維持し、クリーンな結果を報告しなければならない。
 
-**Constitution Authority**: The project constitution (`.specify/memory/constitution.md`) is
-**non-negotiable**. Code that violates a MUST principle is the highest-severity finding and
-produces a corresponding remediation task. If the constitution is an unfilled template,
-skip constitution checks gracefully rather than failing.
+**Constitution Authority（憲法の権威）**: プロジェクトの憲法（`.specify/memory/constitution.md`）は**交渉の余地がありません**。MUST原則に違反するコードは最も重大度の高い所見であり、対応する是正タスクを生成する。憲法が未記入のテンプレートである場合は、失敗するのではなく、憲法チェックを穏当にスキップすること。
 
-## Execution Steps
+## Execution Steps（実行手順）
 
-### 1. Initialize Convergence Context
+### 1. 収束コンテキストの初期化
 
-Run `.specify/scripts/powershell/check-prerequisites.ps1 -Json -RequireSpec -RequireTasks -IncludeTasks` once from repo root and parse JSON for FEATURE_DIR and AVAILABLE_DOCS. Derive absolute paths:
+リポジトリのルートから `.specify/scripts/powershell/check-prerequisites.ps1 -Json -RequireSpec -RequireTasks -IncludeTasks` を一度実行し、FEATURE_DIR と AVAILABLE_DOCS のJSONをパースする。絶対パスを導出する:
 
 - SPEC = FEATURE_DIR/spec.md
 - PLAN = FEATURE_DIR/plan.md
 - TASKS = FEATURE_DIR/tasks.md
-- CONSTITUTION = `.specify/memory/constitution.md` (if present)
-If `spec.md`, `plan.md`, or `tasks.md` is missing, STOP with a clear, actionable message naming the
-prerequisite command to run (`/speckit-specify` for a missing spec, `/speckit-plan` for a missing plan,
-`/speckit-tasks` for missing tasks). Do not produce partial output.
-For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
+- CONSTITUTION = `.specify/memory/constitution.md`（存在する場合）
 
-### 2. Load Artifacts (Progressive Disclosure)
+`spec.md`、`plan.md`、`tasks.md` のいずれかが欠けている場合、実行すべき前提コマンド名（specが欠けているなら `/speckit-specify`、planが欠けているなら `/speckit-plan`、tasksが欠けているなら `/speckit-tasks`）を挙げた明確で実行可能なメッセージとともに停止する。部分的な出力は生成しないこと。
+"I'm Groot" のような引数中のシングルクォートには、エスケープ構文を使用すること: 例 'I'\''m Groot'（可能であればダブルクォートを使用: "I'm Groot"）。
 
-Load only the minimal necessary context from each artifact:
+### 2. 成果物のロード（プログレッシブ・ディスクロージャー）
 
-**From spec.md:**
+各成果物から必要最小限のコンテキストのみをロードする:
 
-- Functional Requirements (FR-###)
-- Success Criteria (SC-###) — include only items requiring buildable work; exclude
-  post-launch outcome metrics and business KPIs
-- User Stories and their Acceptance Scenarios
-- Edge Cases (if present)
+**spec.md から:**
 
-**From plan.md:**
+- 機能要件（FR-###）
+- 成功基準（SC-###） — ビルド可能な作業を必要とする項目のみを含め、公開後の成果指標やビジネスKPIは除外する
+- ユーザーストーリーとその受け入れシナリオ
+- エッジケース（存在する場合）
 
-- Architecture/stack choices and technical decisions
-- Data Model references
-- Phases and named touch-points (files/components the plan says will be created or edited)
-- Technical constraints
+**plan.md から:**
 
-**From tasks.md:**
+- アーキテクチャ/スタックの選択と技術的決定
+- データモデルの参照
+- フェーズと、名指しされたタッチポイント（planで作成・編集されると述べられているファイル/コンポーネント）
+- 技術的制約
 
-- Task IDs (to compute the next ID and next phase number)
-- Descriptions, phase grouping, and referenced file paths
+**tasks.md から:**
 
-**From constitution (if not an unfilled template):**
+- タスクID（次のIDと次のフェーズ番号を計算するため）
+- 説明、フェーズのグルーピング、参照されているファイルパス
 
-- Principle names and MUST/SHOULD normative statements
+**constitution から（未記入のテンプレートでない場合）:**
 
-### 3. Build the Intent Inventory
+- 原則名とMUST/SHOULDの規範的記述
 
-Create an internal model (do not echo raw artifacts):
+### 3. 意図のインベントリを構築する
 
-- **Requirements inventory**: one stable key per FR-### / SC-### / user-story acceptance
-  scenario (e.g. `US1/AC2`), plus the plan decisions and constitution principles that
-  impose buildable obligations.
-- **Code-scope map**: from the file paths named in `plan.md` and `tasks.md`, plus a keyword
-  search for the concepts each requirement describes, derive the set of source files and
-  components in scope for assessment. Bound the assessment to these — do **not** infer
-  scope beyond what the artifacts define.
+内部モデルを作成する（生の成果物をそのまま出力しないこと）:
 
-### 4. Assess the Codebase and Classify Findings
+- **要件インベントリ**: FR-### / SC-### / ユーザーストーリーの受け入れシナリオ（例: `US1/AC2`）ごとに安定したキーを1つ、さらにビルド可能な義務を課すplanの決定と憲法の原則を加える。
+- **コードスコープマップ**: `plan.md` と `tasks.md` に記載されたファイルパスに加え、各要件が説明する概念のキーワード検索から、評価対象となるソースファイルとコンポーネントの集合を導出する。評価はこれらに限定する — 成果物が定義する範囲を超えてスコープを推測しては**いけない**。
 
-For each item in the intent inventory, inspect the current code in scope and produce a
-`Finding` only where there is a gap. Classify every finding by **gap type**:
+### 4. コードベースを評価し、所見を分類する
 
-- **`missing`**: the required work is absent from the code entirely.
-- **`partial`**: the work exists but does not yet fully satisfy the requirement /
-  acceptance criterion / plan decision.
-- **`contradicts`**: the code does something that conflicts with stated intent or a
-  constitution MUST principle.
-- **`unrequested`**: the code contains work not called for by the spec, plan, or tasks
-  (surfaced for awareness — converge does **not** delete code, it only appends a task to
-  review/justify or remove it).
+意図インベントリの各項目について、対象範囲の現在のコードを検査し、ギャップがある場合にのみ `Finding`（所見）を作成する。すべての所見を**ギャップの種類**によって分類する:
 
-Each `Finding` records: a stable id, the `source-ref` it traces to, the `gap-type`, a
-severity, and a short human-readable description with the evidence (the file/area observed).
+- **`missing`**: 必要な作業がコードにまったく存在しない。
+- **`partial`**: 作業は存在するが、要件/受け入れ基準/plan上の決定をまだ完全には満たしていない。
+- **`contradicts`**: コードが、明示された意図や憲法のMUST原則と矛盾することを行っている。
+- **`unrequested`**: コードに、spec・plan・tasksが要求していない作業が含まれている（認識のために表面化させる — convergeはコードを削除せず、レビュー/正当化または削除するためのタスクを追記するのみ）。
 
-**Edge cases:**
+各 `Finding` には以下を記録する: 安定したid、トレースする先の `source-ref`、`gap-type`、重大度、観察された証拠（ファイル/領域）を伴う短い人間可読の説明。
 
-- **Little or no code yet**: treat the entire specified scope as `missing` remaining work
-  rather than failing.
-- **Nothing remains**: produce zero findings and follow the converged branch in Step 7.
+**エッジケース:**
 
-### 5. Assign Severity
+- **コードがほとんど、またはまったくない**: 仕様化されたスコープ全体を、失敗としてではなく `missing` の残作業として扱う。
+- **何も残っていない**: 所見をゼロとして、ステップ7の収束済みブランチに従う。
 
-- **CRITICAL**: violates a constitution MUST principle, or a `missing`/`contradicts` gap
-  that blocks baseline functionality of a P1 user story.
-- **HIGH**: a `missing` or `partial` gap on a core functional requirement or acceptance
-  criterion.
-- **MEDIUM**: a `partial` gap on a secondary requirement, or an `unrequested` addition with
-  unclear justification.
-- **LOW**: minor partial gaps, polish, or low-risk `unrequested` additions.
+### 5. 重大度の割り当て
 
-### 6. Present the In-Session Findings Summary
+- **CRITICAL**: 憲法のMUST原則に違反している、またはP1ユーザーストーリーのベースライン機能をブロックする `missing`/`contradicts` のギャップ。
+- **HIGH**: コアとなる機能要件や受け入れ基準における `missing` または `partial` のギャップ。
+- **MEDIUM**: 副次的な要件における `partial` のギャップ、または正当化が不明確な `unrequested` の追加。
+- **LOW**: 軽微な部分的ギャップ、仕上げ、または低リスクな `unrequested` の追加。
 
-Before appending anything, output a compact, severity-graded summary (no file writes yet):
+### 6. セッション内の所見サマリーを提示する
+
+何かを追記する前に、コンパクトで重大度別のサマリーを出力する（まだファイルへの書き込みは行わない）:
 
 ## Convergence Findings
 
 | ID | Gap Type | Severity | Source | Evidence | Remaining Work |
 |----|----------|----------|--------|----------|----------------|
-| F1 | missing  | HIGH     | FR-008 | Example: no append-only guard detected in path/to/module.py when writing tasks.md | Add append-only enforcement |
+| F1 | missing  | HIGH     | FR-008 | 例: tasks.md書き込み時、path/to/module.py に追記専用のガードが検出されない | 追記専用の強制を追加する |
 
-**Summary metrics:**
+**Summary metrics（サマリー指標）:**
 
-- Requirements / acceptance criteria checked
-- Plan decisions checked
-- Constitution principles checked (or "skipped — template")
-- Findings by gap type (missing / partial / contradicts / unrequested)
-- Findings by severity
+- 確認した要件/受け入れ基準の数
+- 確認したplan上の決定の数
+- 確認した憲法の原則の数（または「skipped — template」）
+- ギャップの種類別の所見（missing / partial / contradicts / unrequested）
+- 重大度別の所見
 
-### 7. Append Convergence Tasks (or report converged)
+### 7. Convergence タスクを追記する（または収束済みと報告する）
 
-**If there are one or more actionable findings** (`tasks_appended` outcome):
+**実行可能な所見が1件以上ある場合**（`tasks_appended` の結果）:
 
-Append to the **end** of `tasks.md`, per the append contract:
+追記契約に従って `tasks.md` の**末尾**に追記する:
 
-1. Scan all existing task IDs; let `M` be the maximum. Determine the next phase number `N`
-   (highest existing phase + 1).
-2. Write a single new section header `## Phase N: Convergence`.
-3. Emit one checklist item per actionable finding, ordered CRITICAL/HIGH first, assigning
-   zero-padded IDs `T{M+1:03d}, T{M+2:03d}, …`:
+1. 既存のすべてのタスクIDをスキャンし、最大値を `M` とする。次のフェーズ番号 `N`（既存の最大フェーズ+1）を決定する。
+2. 新しいセクション見出し `## Phase N: Convergence` を1つ書く。
+3. 実行可能な所見1件につき1つのチェックリスト項目を、CRITICAL/HIGHを先頭にした順序で発行し、ゼロ埋めされたID `T{M+1:03d}, T{M+2:03d}, …` を割り当てる:
 
    ```markdown
-   - [ ] T042 <imperative description> per <source-ref> (<gap-type>)
+   - [ ] T042 <命令形の説明> per <source-ref> (<gap-type>)
    ```
 
-   `<source-ref>` traces the task to its origin: e.g. `FR-003`, `SC-002`,
-   `US1/AC2`, `plan: storage decision`, `Constitution II`.
+   `<source-ref>` はタスクをその出所にトレースする。例: `FR-003`、`SC-002`、`US1/AC2`、`plan: storage decision`、`Constitution II`。
 
-   `<gap-type>` is one of `missing`, `partial`, `contradicts`, `unrequested`.
+   `<gap-type>` は `missing`、`partial`、`contradicts`、`unrequested` のいずれか。
 
-   Constitution-violation tasks MUST be emitted first and described as
-   `CRITICAL`.
-4. Never reuse or renumber existing IDs. If a prior Convergence phase exists, add a new,
-   separately-numbered one below it — do not touch the old one.
+   憲法違反のタスクは必ず最初に発行し、`CRITICAL` として記述しなければならない。
+4. 既存のIDを再利用したり番号を振り直したりしない。以前のConvergenceフェーズが存在する場合は、その下に別途番号を振った新しいものを追加する — 古いものには触れないこと。
 
-**If there are no actionable findings** (`converged` outcome):
+**実行可能な所見が1件もない場合**（`converged` の結果）:
 
-- Do **not** modify `tasks.md` at all — no empty phase header.
-- Report: **"✅ Converged — the implementation satisfies the spec, plan, and tasks."**
-- Include the summary counts of what was checked.
+- `tasks.md` を一切変更**しない** — 空のフェーズ見出しも作らない。
+- 報告する: **「✅ Converged — 実装はspec・plan・tasksを満たしています。」**
+- 確認した内容のサマリー件数を含める。
 
-### 8. Provide Next Actions (Handoff)
+### 8. 次のアクションを提示する（引き継ぎ）
 
-- On `tasks_appended`: state how many tasks were appended under which phase, and recommend
-  running `/speckit-implement` to complete them; note that a follow-up converge
-  run will find fewer or no remaining items.
-- On `converged`: recommend proceeding to review / opening a PR. No further implement pass
-  is needed for this feature's specified scope.
+- `tasks_appended` の場合: どのフェーズの下に何件のタスクが追記されたかを述べ、それらを完了させるために `/speckit-implement` を実行することを推奨する。後続のconverge実行では残りの項目が減る、あるいはなくなることを注記する。
+- `converged` の場合: レビューへの移行やPRのオープンを推奨する。このフィーチャーの仕様化されたスコープについては、これ以上のimplementパスは不要。
 
-### 9. Check for extension hooks
+### 9. 拡張フックの確認
 
-After producing the result, check if `.specify/extensions.yml` exists in the project root.
+結果を出力した後、プロジェクトルートに `.specify/extensions.yml` が存在するか確認する。
 
-- If it exists, read it and look for entries under the `hooks.after_converge` key
-- If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
-- Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.
-- For each remaining hook, do **not** attempt to interpret or evaluate hook `condition` expressions:
-  - If the hook has no `condition` field, or it is null/empty, treat the hook as executable
-  - If the hook defines a non-empty `condition`, skip the hook and leave condition evaluation to the HookExecutor implementation
-- Report the convergence outcome (`converged` or `tasks_appended`) in-session before listing
-  any hooks, so users can decide whether to run optional follow-up commands.
-- When constructing command invocations from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `/speckit-git-commit`.
-- For each executable hook, output the following based on its `optional` flag:
-  - **Optional hook** (`optional: true`):
+- 存在する場合は読み込み、`hooks.after_converge` キー配下のエントリを探す
+- YAMLの解析に失敗する場合や不正な場合は、フックのチェックを黙ってスキップし、通常通り続行する
+- `enabled` が明示的に `false` であるフックは除外する。`enabled` フィールドがないフックはデフォルトで有効として扱う
+- 残りの各フックについて、フックの `condition` 式を解釈・評価しようとしては**いけない**:
+  - フックに `condition` フィールドがない、またはそれが null/空である場合、そのフックは実行可能として扱う
+  - フックが空でない `condition` を定義している場合、そのフックはスキップし、条件の評価は HookExecutor の実装に委ねる
+- どのフックを列挙するよりも前に、収束の結果（`converged` または `tasks_appended`）をセッション内で報告し、ユーザーが任意のフォローアップコマンドを実行するかどうかを判断できるようにする。
+- フックコマンド名からコマンド呼び出しを構築する際は、ドット（`.`）をハイフン（`-`）に置き換える。例: `speckit.git.commit` → `/speckit-git-commit`。
+- 実行可能な各フックについて、`optional` フラグに基づいて以下を出力する:
+  - **オプションフック** (`optional: true`):
 
     ```text
     ## Extension Hooks
@@ -265,7 +224,7 @@ After producing the result, check if `.specify/extensions.yml` exists in the pro
     To execute: `/{command}`
     ```
 
-  - **Mandatory hook** (`optional: false`):
+  - **必須フック** (`optional: false`):
 
     ```text
     ## Extension Hooks
@@ -274,6 +233,6 @@ After producing the result, check if `.specify/extensions.yml` exists in the pro
     Executing: `/{command}`
     EXECUTE_COMMAND: {command}
     ```
-    After emitting the block above you MUST actually invoke the hook and wait for it to finish before continuing. Run it the same way you would run the command yourself in this agent/session (the invocation may differ from the literal `{command}` id shown above, e.g. a skills-mode agent runs it as `/skill:speckit-...` or `$speckit-...`). Emitting the block alone does not run the hook.
+    上のブロックを出力した後、実際にそのフックを呼び出し、完了を待ってから続行しなければなりません。このエージェント/セッションで自分自身がコマンドを実行するのと同じ方法で実行してください（呼び出し方法は上記の文字通りの `{command}` id とは異なる場合があります。例えばスキルモードのエージェントでは `/skill:speckit-...` や `$speckit-...` として実行されます）。上記のブロックを出力するだけではフックは実行されません。
 
-- If no hooks are registered or `.specify/extensions.yml` does not exist, skip silently
+- フックが登録されていない、または `.specify/extensions.yml` が存在しない場合は、黙ってスキップする
