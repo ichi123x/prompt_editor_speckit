@@ -1,0 +1,430 @@
+## Visual Studio の一時ファイル、ビルド結果、
+## および主要な Visual Studio アドオンが生成するファイルを無視する
+##
+## 最新版は https://github.com/github/gitignore/blob/main/VisualStudio.gitignore から取得
+
+# ユーザー固有のファイル
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.env
+
+# ユーザー固有のファイル (MonoDevelop/Xamarin Studio)
+*.userprefs
+
+# Mono の自動生成ファイル
+mono_crash.*
+
+# ビルド結果
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+
+[Dd]ebug/x64/
+[Dd]ebugPublic/x64/
+[Rr]elease/x64/
+[Rr]eleases/x64/
+bin/x64/
+obj/x64/
+
+[Dd]ebug/x86/
+[Dd]ebugPublic/x86/
+[Rr]elease/x86/
+[Rr]eleases/x86/
+bin/x86/
+obj/x86/
+
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+[Aa][Rr][Mm]64[Ee][Cc]/
+bld/
+[Oo]bj/
+[Oo]ut/
+[Ll]og/
+[Ll]ogs/
+
+# 'Bin' ディレクトリ内のビルド結果
+**/[Bb]in/*
+# *.refresh ファイルでバイナリを移動するタスクがある場合はコメント解除
+# (https://github.com/github/gitignore/pull/3736)
+#!**/[Bb]in/*.refresh
+
+# Visual Studio 2015/2017 キャッシュ/オプションディレクトリ
+.vs/
+# プロジェクトの静的ファイルを wwwroot に生成するタスクがある場合はコメント解除
+#wwwroot/
+
+# Visual Studio 2017 自動生成ファイル
+Generated\ Files/
+
+# MSTest テスト結果
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.trx
+
+# NUnit
+*.VisualState.xml
+TestResult.xml
+nunit-*.xml
+
+# Approval Tests の結果ファイル
+*.received.*
+
+# ATL プロジェクトのビルド結果
+[Dd]ebugPS/
+[Rr]eleasePS/
+dlldata.c
+
+# ベンチマーク結果
+BenchmarkDotNet.Artifacts/
+
+# .NET Core
+project.lock.json
+project.fragment.lock.json
+artifacts/
+.artifacts/
+
+# ASP.NET スキャフォールディング
+ScaffoldingReadMe.txt
+
+# StyleCop
+StyleCopReport.xml
+
+# Visual Studio がビルドするファイル
+*_i.c
+*_p.c
+*_h.h
+*.ilk
+*.meta
+*.obj
+*.idb
+*.iobj
+*.pch
+*.pdb
+*.ipdb
+*.pgc
+*.pgd
+*.rsp
+# ただし Directory.Build.rsp は除く（ディレクトリレベルのビルド既定値を設定するため）
+!Directory.Build.rsp
+*.sbr
+*.tlb
+*.tli
+*.tlh
+*.tmp
+*.tmp_proj
+*_wpftmp.csproj
+*.log
+*.tlog
+*.vspscc
+*.vssscc
+.builds
+*.pidb
+*.svclog
+*.scc
+
+# Chutzpah テストファイル
+_Chutzpah*
+
+# Visual C++ キャッシュファイル
+ipch/
+*.aps
+*.ncb
+*.opendb
+*.opensdf
+*.cachefile
+*.VC.db
+*.VC.VC.opendb
+
+# Visual Studio プロファイラー
+*.psess
+*.vsp
+*.vspx
+*.sap
+
+# Visual Studio トレースファイル
+*.e2e
+
+# TFS 2012 ローカルワークスペース
+$tf/
+
+# Guidance Automation Toolkit
+*.gpState
+
+# ReSharper は .NET コーディング用アドイン
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# TeamCity はビルドアドイン
+_TeamCity*
+
+# DotCover はコードカバレッジツール
+*.dotCover
+
+# AxoCover はコードカバレッジツール
+.axoCover/*
+!.axoCover/settings.json
+
+# Coverlet は無料でクロスプラットフォームのコードカバレッジツール
+coverage*.json
+coverage*.xml
+coverage*.info
+
+# Visual Studio コードカバレッジ結果
+*.coverage
+*.coveragexml
+
+# NCrunch
+_NCrunch_*
+.NCrunch_*
+.*crunch*.local.xml
+nCrunchTemp_*
+
+# MightyMoose
+*.mm.*
+AutoTest.Net/
+
+# Web workbench (sass)
+.sass-cache/
+
+# Installshield 出力フォルダ
+[Ee]xpress/
+
+# DocProject はドキュメント生成アドイン
+DocProject/buildhelp/
+DocProject/Help/*.HxT
+DocProject/Help/*.HxC
+DocProject/Help/*.hhc
+DocProject/Help/*.hhk
+DocProject/Help/*.hhp
+DocProject/Help/Html2
+DocProject/Help/html
+
+# Click-Once ディレクトリ
+publish/
+
+# Web 発行出力
+*.[Pp]ublish.xml
+*.azurePubxml
+# 注意: Web デプロイ設定をチェックインしたい場合は次の行をコメントアウトしてください。
+# ただし、データベース接続文字列（パスワードを含む可能性あり）が暗号化されずに保存されます
+*.pubxml
+*.publishproj
+
+# Microsoft Azure Web App の発行設定。Azure Web App の発行設定をチェックインしたい場合は
+# 次の行をコメントアウトしてください。ただし、これらのスクリプトに含まれる機密情報は
+# 暗号化されずに保存されます
+PublishScripts/
+
+# NuGet パッケージ
+*.nupkg
+# NuGet シンボルパッケージ
+*.snupkg
+# パッケージの復元により packages フォルダは無視できる
+**/[Pp]ackages/*
+# ただし build/ は MSBuild ターゲットとして使用されるため除外
+!**/[Pp]ackages/build/
+# 必要な場合はコメント解除（通常は必要な際に再生成されます）
+#!**/[Pp]ackages/repositories.config
+# NuGet v3 の project.json ファイルはさらに無視可能なファイルを生成する
+*.nuget.props
+*.nuget.targets
+
+# Microsoft Azure ビルド出力
+csx/
+*.build.csdef
+
+# Microsoft Azure エミュレーター
+ecf/
+rcf/
+
+# Windows Store アプリのパッケージディレクトリとファイル
+AppPackages/
+BundleArtifacts/
+Package.StoreAssociation.xml
+_pkginfo.txt
+*.appx
+*.appxbundle
+*.appxupload
+
+# Visual Studio キャッシュファイル
+# .cache で終わるファイルは無視してよい
+*.[Cc]ache
+# ただし .cache で終わるディレクトリは追跡する
+!?*.[Cc]ache/
+
+# その他
+ClientBin/
+~$*
+*~
+*.dbmdl
+*.dbproj.schemaview
+*.jfm
+*.pfx
+*.publishsettings
+orleans.codegen.cs
+
+# 強い名前ファイルを含めるとセキュリティリスクになる場合がある
+# (https://github.com/github/gitignore/pull/2483#issue-259490424)
+#*.snk
+
+# 複数のワークフローがある場合、bower_components を無視するには次の行をコメント解除
+# (https://github.com/github/gitignore/pull/1529#issuecomment-104372622)
+#bower_components/
+
+# RIA/Silverlight プロジェクト
+Generated_Code/
+
+# 古いプロジェクトファイルを新しい Visual Studio バージョンに変換した際の
+# バックアップ＆レポートファイル。Git があるためバックアップファイルは不要
+_UpgradeReport_Files/
+Backup*/
+UpgradeLog*.XML
+UpgradeLog*.htm
+ServiceFabricBackup/
+*.rptproj.bak
+
+# SQL Server ファイル
+*.mdf
+*.ldf
+*.ndf
+
+# ビジネスインテリジェンスプロジェクト
+*.rdl.data
+*.bim.layout
+*.bim_*.settings
+*.rptproj.rsuser
+*- [Bb]ackup.rdl
+*- [Bb]ackup ([0-9]).rdl
+*- [Bb]ackup ([0-9][0-9]).rdl
+
+# Microsoft Fakes
+FakesAssemblies/
+
+# GhostDoc プラグイン設定ファイル
+*.GhostDoc.xml
+
+# Visual Studio 用 Node.js Tools
+.ntvs_analysis.dat
+node_modules/
+
+# Visual Studio 6 ビルドログ
+*.plg
+
+# Visual Studio 6 ワークスペースオプションファイル
+*.opt
+
+# Visual Studio 6 自動生成ワークスペースファイル（開いていたファイルなどを含む）
+*.vbw
+
+# Visual Studio 6 ワークスペース・プロジェクトファイル（含めるファイル一覧を含む作業用プロジェクトファイル）
+*.dsw
+*.dsp
+
+# Visual Studio 6 技術ファイル
+*.ncb
+*.aps
+
+# Visual Studio LightSwitch ビルド出力
+**/*.HTMLClient/GeneratedArtifacts
+**/*.DesktopClient/GeneratedArtifacts
+**/*.DesktopClient/ModelManifest.xml
+**/*.Server/GeneratedArtifacts
+**/*.Server/ModelManifest.xml
+_Pvt_Extensions
+
+# Paket 依存関係マネージャー
+**/.paket/paket.exe
+paket-files/
+
+# FAKE - F# Make
+**/.fake/
+
+# CodeRush 個人設定
+**/.cr/personal
+
+# Python Tools for Visual Studio (PTVS)
+**/__pycache__/
+*.pyc
+
+# Cake - 使用している場合はコメント解除
+#tools/**
+#!tools/packages.config
+
+# Tabs Studio
+*.tss
+
+# Telerik の JustMock 設定ファイル
+*.jmconfig
+
+# BizTalk ビルド出力
+*.btp.cs
+*.btm.cs
+*.odx.cs
+*.xsd.cs
+
+# OpenCover UI 解析結果
+OpenCover/
+
+# Azure Stream Analytics ローカル実行出力
+ASALocalRun/
+
+# MSBuild バイナリ・構造化ログ
+*.binlog
+MSBuild_Logs/
+
+# AWS SAM のビルド・一時アーティファクトフォルダ
+.aws-sam
+
+# NVidia Nsight GPU デバッガー設定ファイル
+*.nvuser
+
+# MFractors (Xamarin 生産性向上ツール) の作業フォルダ
+**/.mfractor/
+
+# Visual Studio のローカル履歴
+**/.localhistory/
+
+# Visual Studio 履歴 (VSHistory) ファイル
+.vshistory/
+
+# BeatPulse ヘルスチェック用一時データベース
+healthchecksdb
+
+# Visual Studio 2017 のパッケージ参照変換ツール用バックアップフォルダ
+MigrationBackup/
+
+# Ionide (クロスプラットフォーム F# VS Code ツール) の作業フォルダ
+**/.ionide/
+
+# Fody - 自動生成される XML スキーマ
+FodyWeavers.xsd
+
+# 複数のツールを併用する人向けの VS Code ファイル
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+
+# Visual Studio Code のローカル履歴
+.history/
+
+# ビルド済み Visual Studio Code 拡張機能
+*.vsix
+
+# ビルド出力の Windows インストーラーファイル
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+
+# 公式 VS Code C# Dev Kit 拡張機能の除外設定
+#*.lscache
