@@ -105,7 +105,7 @@ description: "プロジェクト種別選択の廃止のタスクリスト"
 **目的**: ビルドの健全性、統合 `.gitignore` の検証、回帰の総点検
 
 - [X] T027 [quickstart.md](./quickstart.md) 手順1の ST-103 を実施する。`Debug`/`Release` × `x64`/`x86` の4構成すべてで MSBuild が成功し、**未使用変数・未使用関数の警告が0件**であること。削除の消し残しはこの警告に現れる。`.sln` に渡すプラットフォーム名は `x86`（`Win32` では `error MSB4126` になる）
-- [ ] T028 [quickstart.md](./quickstart.md) 手順6の ST-104 を実施する。生成された `.gitignore` に Visual Studio 系（`[Dd]ebug/`・`.vs/`・`*.vcxproj.user`・`*.aps`）と **Node 系（`node_modules/`・`dist/`・`.env`）の双方**が含まれること。MFCプロジェクトでも Node 系が入るのが正しい。追記ブロックの目印行が各1回のみで、同一パターンの重複が無いこと。T022 に依存
+- [X] T028 [quickstart.md](./quickstart.md) 手順6の ST-104 を実施する。生成された `.gitignore` に Visual Studio 系（`[Dd]ebug/`・`.vs/`・`*.vcxproj.user`・`*.aps`）と **Node 系（`node_modules/`・`dist/`・`.env`）の双方**が含まれること。MFCプロジェクトでも Node 系が入るのが正しい。追記ブロックの目印行が各1回のみで、同一パターンの重複が無いこと。T022 に依存
 - [ ] T029 [quickstart.md](./quickstart.md) 手順9の **ST-106 / DT-108** を実施する。`C:\work\test\web01` でもSDD化を実行し、`test01` と `web01` の `.gitignore` を SHA256 で突き合わせて**完全に一致**することを確認する（SC-105）。不一致なら、フォルダの内容によって `.gitignore` を切り替える分岐が実装に残っている（FR-106 違反）。あわせて、MFC と Web で操作手順が完全に同一であったことを確認する（SC-104）。T022、T028 に依存
 - [ ] T030 [quickstart.md](./quickstart.md) 手順7の DT-105（べき等性の回帰確認）を実施する。再実行で5手順すべてが「スキップ」、`git status` に変更が出ず、コミット数が増えず、追記ブロックが重複しないこと。DT-105・DT-106・DT-107 がすべて合格することで、001 の検証項目が再現したといえる（SC-103）。T022 に依存
 - [X] T031 [P] [quickstart.md](./quickstart.md) 手順2の ST-105 を実施する。変更した各箇所が FR-101〜FR-109 のどれに対応するかコード上で追跡できること。不足していればコメントを追加する

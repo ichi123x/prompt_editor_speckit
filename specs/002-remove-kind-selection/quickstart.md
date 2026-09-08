@@ -185,7 +185,7 @@ Push-Location C:\work\test\test01; git rev-list --count HEAD; Pop-Location
 ```powershell
 $gi='C:\work\test\test01\.gitignore'
 "--- Visual Studio 系 ---"
-Select-String -Path $gi -Pattern '\[Dd\]ebug/','\.vs/','\*\.vcxproj\.user','\*\.aps' | ForEach-Object { $_.Line }
+Select-String -Path $gi -Pattern '\[Dd\]ebug/','\.vs/','\*\.user','\*\.aps' | ForEach-Object { $_.Line }
 "--- Node 系（MFCプロジェクトでも含まれること）---"
 Select-String -Path $gi -Pattern 'node_modules/','dist/','\.env$' | ForEach-Object { $_.Line }
 "--- 追記ブロックの目印行（各1回のみ）---"
@@ -201,6 +201,19 @@ if($dup){ "重複あり: " + ($dup.Name -join ', ') } else { "重複なし（OK�
 - Visual Studio 系と **Node 系の両方**が含まれる（MFCプロジェクトでも `node_modules/` が入るのが正しい）
 - 目印行はそれぞれ **1回のみ**
 - 同じパターンの重複が **無い**
+
+**注意**: 統合ファイルは `*.vcxproj.user` ではなく、より広い **`*.user`** を持つ。`test01.vcxproj.user` は `*.user` にマッチするため除外される。パターン名の直接照合ではなく、実ファイルが除外されるかで確認するほうが確実である。
+
+```powershell
+Push-Location C:\work\test\test01
+foreach($f in 'test01.vcxproj.user','test01.aps','.vs/test01','x64/Debug/a.obj','node_modules/x'){
+  $r = git check-ignore -v -- $f 2>&1
+  "{0,-24} {1}" -f $f, $(if($LASTEXITCODE -eq 0){ ($r -split "`t")[0] } else { '除外されない（NG）' })
+}
+Pop-Location
+```
+
+5件すべてが除外され、どの行が効いたかが表示されること。
 
 ---
 
