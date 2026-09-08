@@ -214,6 +214,16 @@ void CMFCApplication1Dlg::AppendResultRow(const CString& name, const CString& st
 	m_listResult.EnsureVisible(row, FALSE);
 }
 
+// 案内文の表示 (002 FR-110〜112 / contracts/ui-contract.md「4-2」)。
+//
+// IDC_STATIC_GUIDE は静的テキストではなく読み取り専用の複数行エディットである。
+// 静的テキストだった頃、5行の案内が3行目で切り詰められて表示され、さらに
+// 001 の User Story 3 が求める「コマンドをそのまま貼り付けられる形」を
+// 満たしていなかった（静的テキストは選択もコピーもできない）。
+//
+// 案内文の行数は今後も変わりうるため、高さの調整ではなくスクロール可能な
+// コントロールで解決している。この関数側の実装は変更不要で、エディットでも
+// SetDlgItemText でそのまま設定できる。
 void CMFCApplication1Dlg::SetGuideText(const CString& text)
 {
 	SetDlgItemText(IDC_STATIC_GUIDE, text);
