@@ -8,6 +8,9 @@
 #include "MFCApplication1Dlg.h"
 #include "afxdialogex.h"
 
+#include "GitignoreWriter.h"
+#include "ProcessRunner.h"
+
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
@@ -59,12 +62,20 @@ CMFCApplication1Dlg::CMFCApplication1Dlg(CWnd* pParent /*=nullptr*/)
 void CMFCApplication1Dlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
+	DDX_Control(pDX, IDC_LIST_RESULT, m_listResult);
 }
 
 BEGIN_MESSAGE_MAP(CMFCApplication1Dlg, CDialogEx)
 	ON_WM_SYSCOMMAND()
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
+	ON_BN_CLICKED(IDC_BUTTON_BROWSE, &CMFCApplication1Dlg::OnBnClickedButtonBrowse)
+	ON_BN_CLICKED(IDC_RADIO_KIND_MFC, &CMFCApplication1Dlg::OnBnClickedRadioKindMfc)
+	ON_BN_CLICKED(IDC_RADIO_KIND_WEB, &CMFCApplication1Dlg::OnBnClickedRadioKindWeb)
+	ON_BN_CLICKED(IDC_BUTTON_GENERATE, &CMFCApplication1Dlg::OnBnClickedButtonGenerate)
+	ON_BN_CLICKED(IDC_BUTTON_DIAGNOSE, &CMFCApplication1Dlg::OnBnClickedButtonDiagnose)
+	ON_MESSAGE(WM_APP_STEP_FINISHED, &CMFCApplication1Dlg::OnStepFinishedMessage)
+	ON_MESSAGE(WM_APP_SETUP_COMPLETED, &CMFCApplication1Dlg::OnSetupCompletedMessage)
 END_MESSAGE_MAP()
 
 
@@ -99,7 +110,26 @@ BOOL CMFCApplication1Dlg::OnInitDialog()
 	SetIcon(m_hIcon, TRUE);			// 大きいアイコンの設定
 	SetIcon(m_hIcon, FALSE);		// 小さいアイコンの設定
 
-	// TODO: 初期化をここに追加します。
+	SetWindowText(_T("SDDプロジェクトのベース作成ツール"));
+
+	// 結果一覧を3列のレポートビューとして初期化する (FR-011, FR-019 / research.md R-009)。
+	InitResultList();
+
+	// 初期状態の契約 (contracts/ui-contract.md「1. 初期状態の契約」):
+	//  - パス表示欄は空。これが「フォルダ未選択」を表す (US1-4 / DT-003 の前提条件)
+	//  - ラジオボタンはどちらも未選択。既定で MFC を選択済みにしてはならない
+	//    (US1-5 / DT-004 の前提条件)
+	//  - 生成・診断ボタンは有効。未選択でも押下でき、押下時に検証する (FR-005)
+	SetDlgItemText(IDC_EDIT_TARGET_PATH, _T(""));
+	CheckDlgButton(IDC_RADIO_KIND_MFC, BST_UNCHECKED);
+	CheckDlgButton(IDC_RADIO_KIND_WEB, BST_UNCHECKED);
+	m_targetPath.Empty();
+	m_kind = ProjectKind::None;
+	m_running = false;
+	SetControlsEnabled(true);
+
+	SetGuideText(_T("対象フォルダを選び、プロジェクトの種別を選んでから「生成」を押してください。")
+				 _T("\r\n対象のプロジェクトは、あらかじめ Visual Studio 2022 などのウィザードで作成し、そのフォルダに配置しておいてください。"));
 
 	return TRUE;  // フォーカスをコントロールに設定した場合を除き、TRUE を返します。
 }
@@ -151,5 +181,380 @@ void CMFCApplication1Dlg::OnPaint()
 HCURSOR CMFCApplication1Dlg::OnQueryDragIcon()
 {
 	return static_cast<HCURSOR>(m_hIcon);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+// SDDプロジェクトのベース作成ツール
+/////////////////////////////////////////////////////////////////////////////
+
+// 結果一覧の初期化 (FR-011, FR-019 / research.md R-009)。
+// 手順結果と診断結果は、いずれも「名称／状態／補足」の3列構造なので同じ一覧を共用する。
+void CMFCApplication1Dlg::InitResultList()
+{
+	m_listResult.SetExtendedStyle(m_listResult.GetExtendedStyle()
+								  | LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES);
+
+	CRect rect;
+	m_listResult.GetClientRect(&rect);
+	const int width = rect.Width() > 0 ? rect.Width() : 600;
+
+	m_listResult.InsertColumn(0, _T("項目"), LVCFMT_LEFT, width * 40 / 100);
+	m_listResult.InsertColumn(1, _T("結果"), LVCFMT_LEFT, width * 20 / 100);
+	m_listResult.InsertColumn(2, _T("内容"), LVCFMT_LEFT, width * 40 / 100);
+}
+
+void CMFCApplication1Dlg::ClearResultList()
+{
+	m_listResult.DeleteAllItems();
+}
+
+void CMFCApplication1Dlg::AppendResultRow(const CString& name, const CString& status,
+										  const CString& detail)
+{
+	const int row = m_listResult.GetItemCount();
+	m_listResult.InsertItem(row, name);
+	m_listResult.SetItemText(row, 1, status);
+	m_listResult.SetItemText(row, 2, detail);
+	m_listResult.EnsureVisible(row, FALSE);
+}
+
+void CMFCApplication1Dlg::SetGuideText(const CString& text)
+{
+	SetDlgItemText(IDC_STATIC_GUIDE, text);
+}
+
+// 実行中に無効化するコントロール (contracts/ui-contract.md「実行中に無効化するコントロール」)。
+//
+// 生成・診断ボタンだけでなく、参照ボタンとラジオボタンも無効化する。仕様のエッジケースが
+// 「処理の実行中にユーザーが別のフォルダを選び直したり、種別を変更したりしても不整合が
+// 起きない」ことを要求しているため、ボタンの連打対策だけでは足りない。
+void CMFCApplication1Dlg::SetControlsEnabled(bool enabled)
+{
+	const BOOL flag = enabled ? TRUE : FALSE;
+
+	CWnd* controls[] = {
+		GetDlgItem(IDC_BUTTON_GENERATE),
+		GetDlgItem(IDC_BUTTON_DIAGNOSE),
+		GetDlgItem(IDC_BUTTON_BROWSE),
+		GetDlgItem(IDC_RADIO_KIND_MFC),
+		GetDlgItem(IDC_RADIO_KIND_WEB)
+	};
+
+	for (CWnd* control : controls)
+	{
+		if (control != nullptr)
+		{
+			control->EnableWindow(flag);
+		}
+	}
+}
+
+// 「参照...」ボタン (FR-001, FR-002)。
+void CMFCApplication1Dlg::OnBnClickedButtonBrowse()
+{
+	CFolderPickerDialog dialog(m_targetPath, OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST, this);
+	if (dialog.DoModal() != IDOK)
+	{
+		// キャンセル時は表示中のパスを変更しない (FR-002 / US1-6 / DT-005)。
+		// ここで m_targetPath を消すと、一度選んだフォルダが未選択に戻ってしまう。
+		return;
+	}
+
+	m_targetPath = dialog.GetPathName();
+	SetDlgItemText(IDC_EDIT_TARGET_PATH, m_targetPath);
+}
+
+// 種別のラジオボタン (FR-003)。
+void CMFCApplication1Dlg::OnBnClickedRadioKindMfc()
+{
+	m_kind = ProjectKind::MfcApp;
+}
+
+void CMFCApplication1Dlg::OnBnClickedRadioKindWeb()
+{
+	m_kind = ProjectKind::WebApp;
+}
+
+// 「生成」ボタンの検証部 (FR-005〜FR-008, FR-015, FR-016)。
+// contracts/ui-contract.md「3.2 生成ボタン」の順序で検証する。
+// いずれかで中止する場合、ファイルシステムへの変更は一切行わない。
+//
+// 重要: この関数の中で生成ボタンを無効化してはならない。FR-014 の二重実行防止は
+// ワーカースレッドが動作している間のみ適用される。ここで無効化すると、ユーザーが
+// フォルダを選択してもボタンが押せなくなる (DT-003 の確認項目(d))。
+bool CMFCApplication1Dlg::ValidateBeforeGenerate(TargetFolderState& state)
+{
+	// 1. フォルダ未選択 (US1-4 / DT-003)
+	if (m_targetPath.IsEmpty())
+	{
+		AfxMessageBox(_T("対象フォルダを選択してください。"), MB_OK | MB_ICONINFORMATION);
+		return false;
+	}
+
+	// 2. 種別未選択 (US1-5 / DT-004)
+	if (m_kind == ProjectKind::None)
+	{
+		AfxMessageBox(_T("プロジェクトの種別を選択してください。"), MB_OK | MB_ICONINFORMATION);
+		return false;
+	}
+
+	// 3. 書き込み権限 (FR-015)
+	if (!TargetFolder::IsWritable(m_targetPath))
+	{
+		AfxMessageBox(_T("対象フォルダに書き込みできません。フォルダの権限を確認してください。"),
+					  MB_OK | MB_ICONWARNING);
+		return false;
+	}
+
+	state = TargetFolder::Read(m_targetPath);
+
+	// 4. マーカーの確認 (FR-006, FR-007, FR-008)
+	if (!state.HasMarkerFor(m_kind))
+	{
+		const ProjectKind other = (m_kind == ProjectKind::MfcApp)
+			? ProjectKind::WebApp : ProjectKind::MfcApp;
+
+		if (state.HasMarkerFor(other))
+		{
+			// 種別の不一致 (FR-008)。確認を得るまで進まない。
+			CString message;
+			message.Format(
+				_T("選択された種別と、フォルダ内のプロジェクトが一致しません。\r\n")
+				_T("選択: %s ／ フォルダ内で見つかったもの: %s\r\n\r\nこのまま続行しますか？"),
+				static_cast<LPCTSTR>(TargetFolder::KindDisplayName(m_kind)),
+				static_cast<LPCTSTR>(TargetFolder::KindDisplayName(other)));
+			if (AfxMessageBox(message, MB_YESNO | MB_ICONQUESTION) != IDYES)
+			{
+				return false;
+			}
+		}
+		else
+		{
+			// どの種別のマーカーも無い (US1-7)。
+			// 本ツールは雛形を保持も生成もしない。ウィザードでの作成を促すに留める (FR-007)。
+			AfxMessageBox(
+				_T("対象のプロジェクトが見つかりません。\r\n")
+				_T("Visual Studio 2022 などのウィザードでプロジェクトを作成し、")
+				_T("このフォルダに配置してから再実行してください。"),
+				MB_OK | MB_ICONINFORMATION);
+			return false;
+		}
+	}
+
+	// 5. 足場が中途半端 (エッジケース)
+	if (state.HasPartialScaffold())
+	{
+		AfxMessageBox(
+			_T(".specify と .claude の一方だけが存在します。\r\n")
+			_T("上書きせずに中止しました。手動で確認してください。"),
+			MB_OK | MB_ICONWARNING);
+		return false;
+	}
+
+	// 6. 入れ子リポジトリ (FR-016)
+	if (state.gitState == GitState::NestedUnderParent)
+	{
+		CString message;
+		message.Format(
+			_T("親フォルダが既に Git リポジトリです（ルート: %s）。\r\n")
+			_T("このまま初期化すると入れ子のリポジトリになります。\r\n\r\n続行しますか？"),
+			static_cast<LPCTSTR>(state.gitRoot));
+		if (AfxMessageBox(message, MB_YESNO | MB_ICONQUESTION) != IDYES)
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
+// 「生成」ボタン (FR-004〜FR-016)。
+void CMFCApplication1Dlg::OnBnClickedButtonGenerate()
+{
+	if (m_running)
+	{
+		return;
+	}
+
+	TargetFolderState state;
+	if (!ValidateBeforeGenerate(state))
+	{
+		// 検証で中止した。ボタンは有効なまま、ファイルの変更も行っていない。
+		return;
+	}
+
+	ClearResultList();
+	SetGuideText(_T("導入処理を実行しています..."));
+
+	// ワーカーへ渡す値をここでコピーする。実行中にダイアログのメンバ変数を
+	// 参照しないことで、UI の変更と処理対象の食い違いを防ぐ
+	// (contracts/ui-contract.md「実行中に無効化するコントロール」)。
+	m_workerPath = m_targetPath;
+	m_workerKind = m_kind;
+	m_steps = SetupRunner::CreateSteps();
+
+	m_running = true;
+	SetControlsEnabled(false);
+
+	if (AfxBeginThread(SetupThreadProc, this) == nullptr)
+	{
+		// スレッドを起動できなかった場合も、必ずボタンを有効へ戻す。
+		m_running = false;
+		SetControlsEnabled(true);
+		AfxMessageBox(_T("処理を開始できませんでした。"), MB_OK | MB_ICONERROR);
+	}
+}
+
+UINT AFX_CDECL CMFCApplication1Dlg::SetupThreadProc(LPVOID param)
+{
+	CMFCApplication1Dlg* dialog = static_cast<CMFCApplication1Dlg*>(param);
+	if (dialog != nullptr)
+	{
+		SetupRunner::RunAll(dialog->m_workerPath, dialog->m_workerKind, dialog->m_steps, dialog);
+		dialog->PostMessage(WM_APP_SETUP_COMPLETED, 0, 0);
+	}
+	return 0;
+}
+
+// ISetupProgressSink: ワーカースレッドから呼ばれる。
+// UI を直接操作せず PostMessage で UI スレッドへ渡す (research.md R-002)。
+void CMFCApplication1Dlg::OnStepFinished(const SetupStep& step)
+{
+	PostMessage(WM_APP_STEP_FINISHED, 0, reinterpret_cast<LPARAM>(new SetupStep(step)));
+}
+
+LRESULT CMFCApplication1Dlg::OnStepFinishedMessage(WPARAM, LPARAM lParam)
+{
+	SetupStep* step = reinterpret_cast<SetupStep*>(lParam);
+	if (step != nullptr)
+	{
+		AppendResultRow(step->displayName,
+						SetupRunner::ResultDisplayName(step->result),
+						step->reason);
+		delete step;
+	}
+	return 0;
+}
+
+LRESULT CMFCApplication1Dlg::OnSetupCompletedMessage(WPARAM, LPARAM)
+{
+	// 成功・失敗・中断のいずれでも、必ずボタンを有効へ戻す
+	// (contracts/ui-contract.md「2. ボタンの有効・無効の契約」)。
+	m_running = false;
+	SetControlsEnabled(true);
+	ShowCompletionGuide();
+	return 0;
+}
+
+// 完了時の定型案内 (FR-011)。
+// 診断結果に応じて内容が変わる手順案内 (FR-022) とは別物で、ここでは診断結果を参照しない。
+void CMFCApplication1Dlg::ShowCompletionGuide()
+{
+	bool anyFailed = false;
+	for (const auto& step : m_steps)
+	{
+		if (step.result == StepResult::Failed)
+		{
+			anyFailed = true;
+			break;
+		}
+	}
+
+	CString guide;
+	if (anyFailed)
+	{
+		guide = _T("一部の手順が失敗しました。一覧の「内容」欄で理由を確認してください。");
+	}
+	else
+	{
+		guide.Format(
+			_T("Spec Kit の導入が完了しました。次の手順は Claude Code との対話が必要です。\r\n")
+			_T(" 1. VS Code で %s を開く（.specify と .claude が直下に見えるフォルダ）\r\n")
+			_T(" 2. Claude パネルで /init を実行し、CLAUDE.md を生成する\r\n")
+			_T(" 3. テスト方針を決め、/speckit-constitution で憲章を制定する\r\n")
+			_T(" 4. /init を再実行し、憲章を反映した CLAUDE.md に更新する"),
+			static_cast<LPCTSTR>(m_workerPath));
+	}
+	SetGuideText(guide);
+}
+
+// 「準備状況を診断」ボタン (FR-017〜FR-021)。
+//
+// 重要: この経路では TargetFolder::IsWritable を呼ばない。一時ファイルの作成が
+// FR-020 の読み取り専用要件に違反するため。
+void CMFCApplication1Dlg::OnBnClickedButtonDiagnose()
+{
+	if (m_running)
+	{
+		return;
+	}
+
+	if (m_targetPath.IsEmpty())
+	{
+		AfxMessageBox(_T("対象フォルダを選択してください。"), MB_OK | MB_ICONINFORMATION);
+		return;
+	}
+
+	ClearResultList();
+
+	const std::vector<ReadinessItem> items = ReadinessChecker::Check(m_targetPath);
+	for (const auto& item : items)
+	{
+		CString name;
+		name.Format(_T("%d. %s"), item.id, static_cast<LPCTSTR>(item.displayName));
+		AppendResultRow(name,
+						ReadinessChecker::VerdictDisplayName(item.verdict),
+						item.nextAction);
+	}
+
+	ShowReadinessGuide(items);
+}
+
+// 診断結果に基づく手順案内 (FR-022)。
+// 自動実行できない4工程を順に並べ、完了済みの工程は完了として区別して示す。
+void CMFCApplication1Dlg::ShowReadinessGuide(const std::vector<ReadinessItem>& items)
+{
+	bool constitutionReady = false;   // 項目5
+	bool claudeMdReady = false;       // 項目6
+	bool stackReady = false;          // 項目7
+	bool allMet = true;
+
+	for (const auto& item : items)
+	{
+		if (item.verdict != ReadinessVerdict::Met)
+		{
+			allMet = false;
+		}
+		switch (item.id)
+		{
+		case 5: constitutionReady = (item.verdict == ReadinessVerdict::Met); break;
+		case 6: claudeMdReady = (item.verdict == ReadinessVerdict::Met); break;
+		case 7: stackReady = (item.verdict == ReadinessVerdict::Met); break;
+		default: break;
+		}
+	}
+
+	if (allMet)
+	{
+		SetGuideText(_T("7項目すべてを満たしています。")
+					 _T("VS Code の Claude パネルで /speckit-specify を実行して、最初の機能仕様から始められます。"));
+		return;
+	}
+
+	// 完了済みの工程には [済] を、未完了には [未] を付けて区別する。
+	CString guide = _T("残りの工程は Claude Code との対話が必要です。次の順に進めてください。\r\n");
+	guide += _T(" 1. [未] テスト方針を決める（何をテスト対象にし、何を対象外にするか）\r\n");
+	guide += constitutionReady
+		? _T(" 2. [済] /speckit-constitution — 憲章は制定済みです\r\n")
+		: _T(" 2. [未] /speckit-constitution — 上の判断を原則として書く\r\n");
+	guide += claudeMdReady
+		? _T(" 3. [済] /init — CLAUDE.md は憲章より新しい状態です\r\n")
+		: _T(" 3. [未] /init — 憲章を反映した CLAUDE.md に更新する\r\n");
+	guide += stackReady
+		? _T(" 4. [済] 技術スタックは CLAUDE.md に記録済みです")
+		: _T(" 4. [未] 言語・ビルド構成・テストランナーを CLAUDE.md に明記してコミットする");
+
+	SetGuideText(guide);
 }
 

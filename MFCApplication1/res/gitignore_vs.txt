@@ -1,0 +1,120 @@
+## Visual Studio 用 .gitignore
+## github/gitignore の VisualStudio.gitignore を基に、MFC / C++ プロジェクトに必要な範囲へ絞ったもの。
+## 本ファイルは RCDATA リソース IDR_GITIGNORE_VS として実行ファイルに埋め込まれる (FR-010, research.md R-007)。
+
+# ユーザー固有のファイル
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# ユーザー固有のファイル (MonoDevelop/Xamarin Studio)
+*.userprefs
+
+# ビルド結果
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio 2015/2017 のキャッシュ/オプション ディレクトリ
+.vs/
+
+# MSTest のテスト結果
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+
+# ベンチマーク結果
+BenchmarkDotNet.Artifacts/
+
+# .NET
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# C++ のビルド中間ファイル
+*.obj
+*.pch
+*.pdb
+*.idb
+*.ilk
+*.tlog
+*.lastbuildstate
+*.log
+*.tli
+*.tlh
+*.res
+*.iobj
+*.ipdb
+
+# C++ リソース エディタの中間ファイル
+*.aps
+*.ncb
+*.opendb
+*.opensdf
+*.sdf
+*.cachefile
+*.VC.db
+*.VC.VC.opendb
+
+# 出力バイナリ
+*.exe
+*.dll
+*.lib
+*.exp
+*.map
+*.ipch
+
+# Visual Studio プロファイラ
+*.psess
+*.vsp
+*.vspx
+*.sap
+
+# Visual Studio Trace Files
+*.e2e
+
+# ReSharper
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# NuGet
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+
+# バックアップと一時ファイル
+*~
+*.bak
+*.tmp
+*.swp
+*.orig
+Backup*/
+_UpgradeReport_Files/
+UpgradeLog*.XML
+UpgradeLog*.htm
+
+# Windows / macOS のシェルが生成するファイル
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# 環境変数ファイル
+.env
+.env.local
+*.local.env

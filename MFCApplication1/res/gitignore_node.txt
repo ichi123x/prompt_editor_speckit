@@ -1,0 +1,77 @@
+## Web アプリ用 .gitignore
+## github/gitignore の Node.gitignore を基に、ASP.NET Core など .NET 系の Web プロジェクトでも使えるよう
+## 最小限の項目を加えたもの。
+## 本ファイルは RCDATA リソース IDR_GITIGNORE_NODE として実行ファイルに埋め込まれる (FR-010, research.md R-007)。
+
+# 依存パッケージ
+node_modules/
+jspm_packages/
+bower_components/
+web_modules/
+
+# ログ
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# 実行時データ
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# テストとカバレッジ
+coverage/
+*.lcov
+.nyc_output/
+
+# ビルド成果物
+dist/
+build/
+out/
+.next/
+.nuxt/
+.svelte-kit/
+.output/
+.vercel/
+.turbo/
+
+# キャッシュ
+.npm/
+.eslintcache
+.stylelintcache
+.cache/
+.parcel-cache/
+.rpt2_cache/
+*.tsbuildinfo
+
+# 環境変数ファイル
+.env
+.env.*
+!.env.example
+
+# .NET (ASP.NET Core などの Web プロジェクト)
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+*.rsuser
+.vs/
+artifacts/
+project.lock.json
+
+# エディタ / IDE
+.idea/
+*.swp
+*.swo
+
+# Windows / macOS のシェルが生成するファイル
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
