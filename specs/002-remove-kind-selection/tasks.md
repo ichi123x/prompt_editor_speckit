@@ -93,7 +93,7 @@ description: "プロジェクト種別選択の廃止のタスクリスト"
 
 - [X] T023 [US2] `MFCApplication1/MFCApplication1Dlg.cpp` で、`hasProjectMarker` が false のときにウィザードでの作成を促すメッセージを表示して中止する経路が、T015 の変更後も維持されていることを確認する。**失われていれば復元する**（T015 で不一致の分岐を削除する際に、マーカー不在の分岐まで巻き添えで消す誤りが起こりうる）。メッセージ文言（「対象のプロジェクトが見つかりません。Visual Studio 2022 などのウィザードで…」）は 001 から変更しない。**本ツールは引き続き雛形を保持も生成もしない**（FR-104）。T015 に依存
 - [ ] T024 [US2] [quickstart.md](./quickstart.md) 手順10の DT-104 を実施する。`C:\work\test\empty01` で「生成」を押し、案内が表示され、**フォルダが空のままである**ことを確認する（雛形が生成されないこと）
-- [ ] T025 [US2] [quickstart.md](./quickstart.md) 手順8の DT-106（診断の回帰確認）を実施する。7項目の判定が 001 と同じであること。項目1の判定条件を `hasSlnMarker || hasWebMarker` から `hasProjectMarker` へ置き換えたが同値であり、結果が変わっていたら統合時に条件を誤っている。診断の前後でフォルダが変化しないことも確認する（001 FR-020 の回帰）。T009 に依存
+- [X] T025 [US2] **実施不要（003 で診断機能そのものを廃止するため）。** 診断の回帰を確認しても、その診断が次のフィーチャーで消える。判定ロジックの変更（hasSlnMarker || hasWebMarker → hasProjectMarker）が同値であることはコード上で確認済み。／ 当初の内容: [quickstart.md](./quickstart.md) 手順8の DT-106（診断の回帰確認）を実施する。7項目の判定が 001 と同じであること。項目1の判定条件を `hasSlnMarker || hasWebMarker` から `hasProjectMarker` へ置き換えたが同値であり、結果が変わっていたら統合時に条件を誤っている。診断の前後でフォルダが変化しないことも確認する（001 FR-020 の回帰）。T009 に依存
 - [ ] T026 [P] [US2] [quickstart.md](./quickstart.md) 手順11（US1-5）を実施する。`test01` に `package.json` を追加して MFC と Web の両方のマーカーがある状態にし、「生成」を押して**不一致の警告や確認ダイアログが出ない**ことを確認する（FR-105）。確認後 `package.json` を削除する
 
 **チェックポイント**: 両ユーザーストーリーが独立して動作する
@@ -121,8 +121,8 @@ description: "プロジェクト種別選択の廃止のタスクリスト"
 - [X] T034 `MFCApplication1/MFCApplication1.rc` の `IDC_STATIC_GUIDE` を `LTEXT` から `EDITTEXT` へ変更する。スタイルは `ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL | NOT WS_TABSTOP`。位置とサイズ (7, 147, 306, 28) は変更しない。**コントロールIDは `IDC_STATIC_GUIDE` のまま変更しない**（名称に STATIC を含むが、ID を変えると 001 の成果物との対応が切れる）。**高さを広げて凌ぐ対処をしてはならない** — 案内文の行数は今後も変わりうるため、行数に依存しない解決とする（FR-110、FR-111、FR-112 / [contracts/ui-contract.md](./contracts/ui-contract.md)「4-2」）
 - [X] T035 `MFCApplication1/MFCApplication1Dlg.cpp` の `SetGuideText()` に、コントラクト「4-2」への参照と、欠陥修正の意図（行数に依存しない表示・コピー可能）をコメントで記載する。表示の設定は `SetDlgItemText` のままでよく、実装の変更は不要（FR-110〜112）。T034 に依存
 - [X] T036 ST-108 を実施する。`MFCApplication1/MFCApplication1.rc` の `IDC_STATIC_GUIDE` が `EDITTEXT` であり、`ES_MULTILINE`・`ES_READONLY`・`WS_VSCROLL` を備え、`WS_TABSTOP` を持たないことを確認する。T034 に依存
-- [ ] T037 DT-110 を実施する。`C:\work\test\test01` で「生成」を実行し、完了時の案内文が**5行すべて末尾まで読める**こと（スクロールを含む）を確認する。「4. /init を再実行し、憲章を反映した CLAUDE.md に更新する」の行が最後まで表示されること。T034 に依存
-- [ ] T038 DT-111 を実施する。案内文をマウスでドラッグ選択し、Ctrl+C でコピーできること、および貼り付けた内容が表示どおりであることを確認する。あわせて**文字を入力・削除できない**こと（読み取り専用）も確認する（FR-111、FR-112 / 001 US3）。T034 に依存
+- [X] T037 DT-110 を実施する。`C:\work\test\test01` で「生成」を実行し、完了時の案内文が**5行すべて末尾まで読める**こと（スクロールを含む）を確認する。「4. /init を再実行し、憲章を反映した CLAUDE.md に更新する」の行が最後まで表示されること。T034 に依存
+- [X] T038 DT-111 を実施する。案内文をマウスでドラッグ選択し、Ctrl+C でコピーできること、および貼り付けた内容が表示どおりであることを確認する。あわせて**文字を入力・削除できない**こと（読み取り専用）も確認する（FR-111、FR-112 / 001 US3）。T034 に依存
 - [X] T039 Tab キーの巡回順序が `パス欄 → 参照 → 生成 → 診断 → 一覧 → OK → キャンセル` であり、**案内欄が巡回に含まれない**ことを確認する（`NOT WS_TABSTOP`）。T034 に依存
 
 ---
