@@ -52,9 +52,9 @@ namespace SetupRunner
 	std::vector<SetupStep> CreateSteps();
 
 	// 5手順を順に実行する。各手順の完了ごとに sink へ通知する。
-	// folderPath と kind はワーカースレッド起動時にコピーされた値であり、
+	// folderPath はワーカースレッド起動時にコピーされた値であり、
 	// 実行中にダイアログのメンバ変数を参照しない (contracts/ui-contract.md「2.」)。
-	void RunAll(const CString& folderPath, ProjectKind kind,
+	void RunAll(const CString& folderPath,
 				std::vector<SetupStep>& steps, ISetupProgressSink* sink);
 
 	// 結果の表示文字列 (contracts/ui-contract.md「4. メッセージ文字列の契約」)。

@@ -51,33 +51,30 @@ protected:
 	CListCtrl m_listResult;      // 手順結果と診断結果を共用する一覧 (research.md R-009)
 
 	// --- 状態 ---
-	CString m_targetPath;        // 選択された対象フォルダ。空なら未選択 (FR-002)
-	ProjectKind m_kind = ProjectKind::None;  // 選択された種別。既定は未選択 (FR-003)
-	bool m_running = false;      // 導入処理の実行中か (FR-014)
+	CString m_targetPath;        // 選択された対象フォルダ。空なら未選択 (001 FR-002)
+	bool m_running = false;      // 導入処理の実行中か (001 FR-014)
+	// 002 FR-101: 種別を保持するメンバは廃止。判定は /speckit-constitution が行う。
 
 	// ワーカースレッドが操作する。UI スレッドは実行中に触らない。
 	std::vector<SetupStep> m_steps;
 	CString m_workerPath;        // ワーカーへ渡す対象フォルダのコピー
-	ProjectKind m_workerKind = ProjectKind::None;  // ワーカーへ渡す種別のコピー
 
 	// --- イベントハンドラ ---
-	afx_msg void OnBnClickedButtonBrowse();     // FR-001, FR-002
-	afx_msg void OnBnClickedRadioKindMfc();     // FR-003
-	afx_msg void OnBnClickedRadioKindWeb();     // FR-003
-	afx_msg void OnBnClickedButtonGenerate();   // FR-004〜FR-016
-	afx_msg void OnBnClickedButtonDiagnose();   // FR-017〜FR-021
+	afx_msg void OnBnClickedButtonBrowse();     // 001 FR-001, FR-002
+	afx_msg void OnBnClickedButtonGenerate();   // 001 FR-004〜FR-016 / 002 FR-102, FR-103, FR-105
+	afx_msg void OnBnClickedButtonDiagnose();   // 001 FR-017〜FR-021
 	afx_msg LRESULT OnStepFinishedMessage(WPARAM wParam, LPARAM lParam);
 	afx_msg LRESULT OnSetupCompletedMessage(WPARAM wParam, LPARAM lParam);
 
 	// --- ヘルパー ---
-	void InitResultList();                                   // FR-011, FR-019
+	void InitResultList();                                   // 001 FR-011, FR-019
 	void ClearResultList();
 	void AppendResultRow(const CString& name, const CString& status, const CString& detail);
 	void SetGuideText(const CString& text);
-	void SetControlsEnabled(bool enabled);                   // contracts/ui-contract.md「2.」
-	bool ValidateBeforeGenerate(TargetFolderState& state);    // FR-005〜FR-008, FR-015, FR-016
-	void ShowCompletionGuide();                              // FR-011（定型の完了メッセージ）
-	void ShowReadinessGuide(const std::vector<ReadinessItem>& items);  // FR-022
+	void SetControlsEnabled(bool enabled);                   // 002 contracts「3.2 実行中に無効化するコントロール」
+	bool ValidateBeforeGenerate(TargetFolderState& state);    // 002 FR-102, FR-103 / 001 FR-015, FR-016
+	void ShowCompletionGuide();                              // 001 FR-011（定型の完了メッセージ）
+	void ShowReadinessGuide(const std::vector<ReadinessItem>& items);  // 001 FR-022
 
 	static UINT AFX_CDECL SetupThreadProc(LPVOID param);
 };

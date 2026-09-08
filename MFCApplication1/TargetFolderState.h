@@ -6,15 +6,11 @@
 
 #include <afxstr.h>
 
-// ユーザーが選択する対象の種別 (data-model.md「2. ProjectKind」)。
-enum class ProjectKind
-{
-	None,     // 未選択。この状態で「生成」を押した場合は中止する (FR-005)
-	MfcApp,   // MFCアプリ。マーカーは *.sln / *.vcxproj
-	WebApp    // Webアプリ。マーカーは package.json / *.csproj
-};
+// 002 FR-101: プロジェクト種別を表す列挙は廃止した。
+// 種別の判定は本ツールの役割ではなく、/speckit-constitution が憲章を制定する
+// 段階で行われる。マーカーは種別を区別せず1つの集合として扱う (002 FR-103)。
 
-// 対象フォルダの Git の状態 (data-model.md「GitState」/ research.md R-006)。
+// 対象フォルダの Git の状態 (001 data-model.md「GitState」/ 001 research.md R-006)。
 enum class GitState
 {
 	NotRepository,      // Gitリポジトリではない (git rev-parse が非0終了)
@@ -25,8 +21,10 @@ enum class GitState
 struct TargetFolderState
 {
 	CString path;                  // 対象フォルダの完全パス。未選択なら空
-	bool hasSlnMarker = false;     // *.sln / *.vcxproj が存在するか
-	bool hasWebMarker = false;     // package.json / *.csproj が存在するか
+	// 認識可能なプロジェクトマーカーが1つ以上あるか (002 FR-103)。
+	// 探すのは *.sln / *.vcxproj / *.csproj / package.json で、001 と同じ集合。
+	// 種別ごとに分けて保持するのをやめ、1つのフラグへ統合した。
+	bool hasProjectMarker = false;
 	bool hasSpecifyDir = false;    // .specify が存在するか
 	bool hasClaudeDir = false;     // .claude が存在するか
 	bool hasGitignore = false;     // .gitignore が存在するか
@@ -35,9 +33,6 @@ struct TargetFolderState
 	int commitCount = 0;           // コミット件数。取得できなければ 0
 
 	bool IsSelected() const { return !path.IsEmpty(); }
-
-	// 指定された種別に対応するマーカーがあるか (FR-006)。
-	bool HasMarkerFor(ProjectKind kind) const;
 
 	// 足場が中途半端な状態か (.specify と .claude の一方だけが存在する)。
 	// エッジケースとして警告の対象になる。
@@ -50,10 +45,7 @@ namespace TargetFolder
 	// 診断 (FR-020 の読み取り専用要件) からも安全に呼び出せる。
 	TargetFolderState Read(const CString& folderPath);
 
-	// 対象フォルダへの書き込み権限を確認する (FR-015)。
-	// 一時ファイルの作成と削除を伴うため、診断からは呼び出してはならない (FR-020)。
+	// 対象フォルダへの書き込み権限を確認する (001 FR-015)。
+	// 一時ファイルの作成と削除を伴うため、診断からは呼び出してはならない (001 FR-020)。
 	bool IsWritable(const CString& folderPath);
-
-	// 種別の表示名を返す。
-	CString KindDisplayName(ProjectKind kind);
 }

@@ -193,15 +193,14 @@ namespace
 	}
 
 	// --- 手順5: Git 初期化・.gitignore・初回コミット (research.md R-006) ----
-	void RunInitGit(SetupStep& step, const CString& folderPath, ProjectKind kind,
-					ISetupProgressSink* sink)
+	void RunInitGit(SetupStep& step, const CString& folderPath, ISetupProgressSink* sink)
 	{
 		TargetFolderState state = TargetFolder::Read(folderPath);
 
 		// .gitignore の追記ブロックまで揃っていて、かつコミット済みなら手順全体をスキップする。
 		bool gitignoreChanged = false;
 		CString gitignoreError;
-		if (!GitignoreWriter::Ensure(folderPath, kind, gitignoreChanged, gitignoreError))
+		if (!GitignoreWriter::Ensure(folderPath, gitignoreChanged, gitignoreError))
 		{
 			Finish(step, StepResult::Failed, gitignoreError, sink);
 			return;
@@ -359,7 +358,7 @@ namespace SetupRunner
 		return steps;
 	}
 
-	void RunAll(const CString& folderPath, ProjectKind kind,
+	void RunAll(const CString& folderPath,
 				std::vector<SetupStep>& steps, ISetupProgressSink* sink)
 	{
 		for (auto& step : steps)
@@ -388,7 +387,7 @@ namespace SetupRunner
 				RunInitSpecKit(step, folderPath, sink);
 				break;
 			case StepId::InitGit:
-				RunInitGit(step, folderPath, kind, sink);
+				RunInitGit(step, folderPath, sink);
 				break;
 			default:
 				break;

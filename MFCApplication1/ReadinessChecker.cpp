@@ -205,12 +205,16 @@ namespace ReadinessChecker
 		CString claudeMdText;
 		const bool hasClaudeMd = FileExists(claudeMdPath) && ReadText(claudeMdPath, claudeMdText);
 
+		// 002 FR-108: 7項目の判定方法・取りうる Verdict・NextAction の文言は
+		// いずれも 001 から変更していない。項目1の条件式のみ、同値な式へ置き換えた。
+
 		// --- 項目1: ビルドが通る雛形がある ---------------------------------
 		// 実ビルドは行わない。マーカーがあれば「達成」、無ければ「判定不能」。
 		// この「達成」はマーカーの存在を示すもので、ビルドの成功を保証しない。
 		{
 			ReadinessItem item = MakeItem(1, _T("ビルドが通る雛形がある"));
-			if (state.hasSlnMarker || state.hasWebMarker)
+			// 002 FR-103: 001 の2つのマーカーフラグの論理和と同値。判定結果は変わらない。
+			if (state.hasProjectMarker)
 			{
 				SetVerdict(item, ReadinessVerdict::Met, _T(""));
 				item.nextAction = _T("プロジェクトを検出しました（実ビルドは未確認です）。");

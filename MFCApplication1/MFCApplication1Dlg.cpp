@@ -70,8 +70,6 @@ BEGIN_MESSAGE_MAP(CMFCApplication1Dlg, CDialogEx)
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
 	ON_BN_CLICKED(IDC_BUTTON_BROWSE, &CMFCApplication1Dlg::OnBnClickedButtonBrowse)
-	ON_BN_CLICKED(IDC_RADIO_KIND_MFC, &CMFCApplication1Dlg::OnBnClickedRadioKindMfc)
-	ON_BN_CLICKED(IDC_RADIO_KIND_WEB, &CMFCApplication1Dlg::OnBnClickedRadioKindWeb)
 	ON_BN_CLICKED(IDC_BUTTON_GENERATE, &CMFCApplication1Dlg::OnBnClickedButtonGenerate)
 	ON_BN_CLICKED(IDC_BUTTON_DIAGNOSE, &CMFCApplication1Dlg::OnBnClickedButtonDiagnose)
 	ON_MESSAGE(WM_APP_STEP_FINISHED, &CMFCApplication1Dlg::OnStepFinishedMessage)
@@ -117,18 +115,15 @@ BOOL CMFCApplication1Dlg::OnInitDialog()
 
 	// 初期状態の契約 (contracts/ui-contract.md「1. 初期状態の契約」):
 	//  - パス表示欄は空。これが「フォルダ未選択」を表す (US1-4 / DT-003 の前提条件)
-	//  - ラジオボタンはどちらも未選択。既定で MFC を選択済みにしてはならない
-	//    (US1-5 / DT-004 の前提条件)
-	//  - 生成・診断ボタンは有効。未選択でも押下でき、押下時に検証する (FR-005)
+	//  - 生成・診断ボタンは有効。未選択でも押下でき、押下時に検証する (001 FR-005)
+	//  - 002 FR-101: 種別を選ぶコントロールは存在しない
 	SetDlgItemText(IDC_EDIT_TARGET_PATH, _T(""));
-	CheckDlgButton(IDC_RADIO_KIND_MFC, BST_UNCHECKED);
-	CheckDlgButton(IDC_RADIO_KIND_WEB, BST_UNCHECKED);
 	m_targetPath.Empty();
-	m_kind = ProjectKind::None;
 	m_running = false;
 	SetControlsEnabled(true);
 
-	SetGuideText(_T("対象フォルダを選び、プロジェクトの種別を選んでから「生成」を押してください。")
+	// 002 FR-107: 種別に言及する初期案内文は削除済み。
+	SetGuideText(_T("対象フォルダを選び、「生成」を押してください。")
 				 _T("\r\n対象のプロジェクトは、あらかじめ Visual Studio 2022 などのウィザードで作成し、そのフォルダに配置しておいてください。"));
 
 	return TRUE;  // フォーカスをコントロールに設定した場合を除き、TRUE を返します。
@@ -224,11 +219,13 @@ void CMFCApplication1Dlg::SetGuideText(const CString& text)
 	SetDlgItemText(IDC_STATIC_GUIDE, text);
 }
 
-// 実行中に無効化するコントロール (contracts/ui-contract.md「実行中に無効化するコントロール」)。
+// 実行中に無効化するコントロール (002 contracts/ui-contract.md「3.2」)。
 //
-// 生成・診断ボタンだけでなく、参照ボタンとラジオボタンも無効化する。仕様のエッジケースが
-// 「処理の実行中にユーザーが別のフォルダを選び直したり、種別を変更したりしても不整合が
-// 起きない」ことを要求しているため、ボタンの連打対策だけでは足りない。
+// 生成・診断ボタンだけでなく、**参照ボタンも無効化する**。処理中にフォルダを
+// 変更されると、ワーカースレッドの処理対象と画面表示が食い違うためである。
+//
+// 002 でラジオボタンを配列から取り除いた際、IDC_BUTTON_BROWSE を巻き添えで
+// 消してはならない (002 research.md R-104(1))。DT-107 がこれを検証する。
 void CMFCApplication1Dlg::SetControlsEnabled(bool enabled)
 {
 	const BOOL flag = enabled ? TRUE : FALSE;
@@ -236,9 +233,7 @@ void CMFCApplication1Dlg::SetControlsEnabled(bool enabled)
 	CWnd* controls[] = {
 		GetDlgItem(IDC_BUTTON_GENERATE),
 		GetDlgItem(IDC_BUTTON_DIAGNOSE),
-		GetDlgItem(IDC_BUTTON_BROWSE),
-		GetDlgItem(IDC_RADIO_KIND_MFC),
-		GetDlgItem(IDC_RADIO_KIND_WEB)
+		GetDlgItem(IDC_BUTTON_BROWSE)
 	};
 
 	for (CWnd* control : controls)
@@ -265,17 +260,6 @@ void CMFCApplication1Dlg::OnBnClickedButtonBrowse()
 	SetDlgItemText(IDC_EDIT_TARGET_PATH, m_targetPath);
 }
 
-// 種別のラジオボタン (FR-003)。
-void CMFCApplication1Dlg::OnBnClickedRadioKindMfc()
-{
-	m_kind = ProjectKind::MfcApp;
-}
-
-void CMFCApplication1Dlg::OnBnClickedRadioKindWeb()
-{
-	m_kind = ProjectKind::WebApp;
-}
-
 // 「生成」ボタンの検証部 (FR-005〜FR-008, FR-015, FR-016)。
 // contracts/ui-contract.md「3.2 生成ボタン」の順序で検証する。
 // いずれかで中止する場合、ファイルシステムへの変更は一切行わない。
@@ -292,14 +276,9 @@ bool CMFCApplication1Dlg::ValidateBeforeGenerate(TargetFolderState& state)
 		return false;
 	}
 
-	// 2. 種別未選択 (US1-5 / DT-004)
-	if (m_kind == ProjectKind::None)
-	{
-		AfxMessageBox(_T("プロジェクトの種別を選択してください。"), MB_OK | MB_ICONINFORMATION);
-		return false;
-	}
-
-	// 3. 書き込み権限 (FR-015)
+	// 2. 書き込み権限 (001 FR-015)
+	//    マーカーの確認より先に行う。権限が無いフォルダでマーカーを探しても意味がない。
+	//    002 でこの順序を変えてはならない (002 research.md R-104(2))。
 	if (!TargetFolder::IsWritable(m_targetPath))
 	{
 		AfxMessageBox(_T("対象フォルダに書き込みできません。フォルダの権限を確認してください。"),
@@ -309,40 +288,22 @@ bool CMFCApplication1Dlg::ValidateBeforeGenerate(TargetFolderState& state)
 
 	state = TargetFolder::Read(m_targetPath);
 
-	// 4. マーカーの確認 (FR-006, FR-007, FR-008)
-	if (!state.HasMarkerFor(m_kind))
+	// 3. マーカーの確認 (002 FR-103, FR-104, FR-105)
+	//    種別を区別せず、認識可能なマーカーが1つ以上あるかだけを見る。
+	//    複数種類のマーカーが共存していても警告は出さない (002 FR-105)。
+	if (!state.hasProjectMarker)
 	{
-		const ProjectKind other = (m_kind == ProjectKind::MfcApp)
-			? ProjectKind::WebApp : ProjectKind::MfcApp;
-
-		if (state.HasMarkerFor(other))
-		{
-			// 種別の不一致 (FR-008)。確認を得るまで進まない。
-			CString message;
-			message.Format(
-				_T("選択された種別と、フォルダ内のプロジェクトが一致しません。\r\n")
-				_T("選択: %s ／ フォルダ内で見つかったもの: %s\r\n\r\nこのまま続行しますか？"),
-				static_cast<LPCTSTR>(TargetFolder::KindDisplayName(m_kind)),
-				static_cast<LPCTSTR>(TargetFolder::KindDisplayName(other)));
-			if (AfxMessageBox(message, MB_YESNO | MB_ICONQUESTION) != IDYES)
-			{
-				return false;
-			}
-		}
-		else
-		{
-			// どの種別のマーカーも無い (US1-7)。
-			// 本ツールは雛形を保持も生成もしない。ウィザードでの作成を促すに留める (FR-007)。
-			AfxMessageBox(
-				_T("対象のプロジェクトが見つかりません。\r\n")
-				_T("Visual Studio 2022 などのウィザードでプロジェクトを作成し、")
-				_T("このフォルダに配置してから再実行してください。"),
-				MB_OK | MB_ICONINFORMATION);
-			return false;
-		}
+		// 本ツールは雛形を保持も生成もしない。ウィザードでの作成を促すに留める
+		// (001 FR-007 / 002 FR-104)。
+		AfxMessageBox(
+			_T("対象のプロジェクトが見つかりません。\r\n")
+			_T("Visual Studio 2022 などのウィザードでプロジェクトを作成し、")
+			_T("このフォルダに配置してから再実行してください。"),
+			MB_OK | MB_ICONINFORMATION);
+		return false;
 	}
 
-	// 5. 足場が中途半端 (エッジケース)
+	// 4. 足場が中途半端 (エッジケース)
 	if (state.HasPartialScaffold())
 	{
 		AfxMessageBox(
@@ -352,7 +313,7 @@ bool CMFCApplication1Dlg::ValidateBeforeGenerate(TargetFolderState& state)
 		return false;
 	}
 
-	// 6. 入れ子リポジトリ (FR-016)
+	// 5. 入れ子リポジトリ (001 FR-016)
 	if (state.gitState == GitState::NestedUnderParent)
 	{
 		CString message;
@@ -391,7 +352,6 @@ void CMFCApplication1Dlg::OnBnClickedButtonGenerate()
 	// 参照しないことで、UI の変更と処理対象の食い違いを防ぐ
 	// (contracts/ui-contract.md「実行中に無効化するコントロール」)。
 	m_workerPath = m_targetPath;
-	m_workerKind = m_kind;
 	m_steps = SetupRunner::CreateSteps();
 
 	m_running = true;
@@ -411,7 +371,7 @@ UINT AFX_CDECL CMFCApplication1Dlg::SetupThreadProc(LPVOID param)
 	CMFCApplication1Dlg* dialog = static_cast<CMFCApplication1Dlg*>(param);
 	if (dialog != nullptr)
 	{
-		SetupRunner::RunAll(dialog->m_workerPath, dialog->m_workerKind, dialog->m_steps, dialog);
+		SetupRunner::RunAll(dialog->m_workerPath, dialog->m_steps, dialog);
 		dialog->PostMessage(WM_APP_SETUP_COMPLETED, 0, 0);
 	}
 	return 0;

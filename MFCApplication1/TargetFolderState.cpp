@@ -69,19 +69,6 @@ namespace
 	}
 }
 
-bool TargetFolderState::HasMarkerFor(ProjectKind kind) const
-{
-	switch (kind)
-	{
-	case ProjectKind::MfcApp:
-		return hasSlnMarker;
-	case ProjectKind::WebApp:
-		return hasWebMarker;
-	default:
-		return false;
-	}
-}
-
 namespace TargetFolder
 {
 	// 対象フォルダの状態を読み取る (FR-006, FR-018)。読み取り専用。
@@ -95,11 +82,13 @@ namespace TargetFolder
 
 		state.path = NormalizePath(folderPath);
 
-		// プロジェクトマーカーの検出 (FR-006)。
-		state.hasSlnMarker = HasFileMatching(state.path, _T("*.sln"))
-			|| HasFileMatching(state.path, _T("*.vcxproj"));
-		state.hasWebMarker = FileExists(CombinePath(state.path, _T("package.json")))
-			|| HasFileMatching(state.path, _T("*.csproj"));
+		// プロジェクトマーカーの検出 (002 FR-103)。
+		// 探すファイルの集合は 001 と同じ。種別ごとに分けて保持するのをやめ、
+		// いずれか1つでも見つかれば true とする。
+		state.hasProjectMarker = HasFileMatching(state.path, _T("*.sln"))
+			|| HasFileMatching(state.path, _T("*.vcxproj"))
+			|| HasFileMatching(state.path, _T("*.csproj"))
+			|| FileExists(CombinePath(state.path, _T("package.json")));
 
 		// Spec Kit の足場と .gitignore。
 		state.hasSpecifyDir = DirectoryExists(CombinePath(state.path, _T(".specify")));
@@ -167,18 +156,5 @@ namespace TargetFolder
 		// FILE_FLAG_DELETE_ON_CLOSE により、ハンドルを閉じた時点で削除される。
 		::CloseHandle(handle);
 		return true;
-	}
-
-	CString KindDisplayName(ProjectKind kind)
-	{
-		switch (kind)
-		{
-		case ProjectKind::MfcApp:
-			return _T("MFCアプリ");
-		case ProjectKind::WebApp:
-			return _T("Webアプリ");
-		default:
-			return _T("(未選択)");
-		}
 	}
 }

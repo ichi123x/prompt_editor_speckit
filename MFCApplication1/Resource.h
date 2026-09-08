@@ -8,15 +8,16 @@
 #define IDS_ABOUTBOX					101
 #define IDD_MFCAPPLICATION1_DIALOG				102
 
-// 埋め込む .gitignore リソース (FR-010)
-#define IDR_GITIGNORE_VS				129
-#define IDR_GITIGNORE_NODE				130
+// 埋め込む .gitignore リソース (001 FR-010 / 002 FR-106)
+// 種別を区別せず常に同じ内容を配置するため、リソースは1件のみ。
+#define IDR_GITIGNORE					129
 
 // SDDプロジェクトのベース作成ツールのコントロール
+// 1002 と 1003 は種別選択のラジオボタンだったが 002 FR-101 で廃止し、
+// 定義も削除した (002 FR-107: 不要となったリソース定義を残さない)。
+// 削除した ID は再利用しない。
 #define IDC_EDIT_TARGET_PATH			1000
 #define IDC_BUTTON_BROWSE				1001
-#define IDC_RADIO_KIND_MFC				1002
-#define IDC_RADIO_KIND_WEB				1003
 #define IDC_BUTTON_GENERATE				1004
 #define IDC_BUTTON_DIAGNOSE				1005
 #define IDC_LIST_RESULT					1006
@@ -27,7 +28,7 @@
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 
-#define _APS_NEXT_RESOURCE_VALUE	131
+#define _APS_NEXT_RESOURCE_VALUE	130
 #define _APS_NEXT_CONTROL_VALUE		1008
 #define _APS_NEXT_SYMED_VALUE		101
 #define _APS_NEXT_COMMAND_VALUE		32771

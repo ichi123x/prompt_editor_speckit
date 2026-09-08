@@ -122,23 +122,14 @@ namespace
 
 namespace GitignoreWriter
 {
-	bool Ensure(const CString& folderPath, ProjectKind kind, bool& changed, CString& errorMessage)
+	bool Ensure(const CString& folderPath, bool& changed, CString& errorMessage)
 	{
 		changed = false;
 		errorMessage.Empty();
 
-		if (kind == ProjectKind::None)
-		{
-			errorMessage = _T("プロジェクトの種別が選択されていません。");
-			return false;
-		}
-
 		CString path = folderPath;
 		path.TrimRight(_T('\\'));
 		path += _T("\\.gitignore");
-
-		const UINT resourceId = (kind == ProjectKind::MfcApp)
-			? IDR_GITIGNORE_VS : IDR_GITIGNORE_NODE;
 
 		DWORD attr = ::GetFileAttributes(path);
 		const bool exists = (attr != INVALID_FILE_ATTRIBUTES)
@@ -151,12 +142,15 @@ namespace GitignoreWriter
 			return false;
 		}
 
-		// 既存ファイルには本体を書き込まない。未記載の追記ブロックのみを足す (FR-010)。
+		// 既存ファイルには本体を書き込まない。未記載の追記ブロックのみを足す
+		// (001 FR-010 / 002 FR-106a)。既存の本体が統合版と異なっていても置き換えない。
 		std::string payload;
 		if (!exists)
 		{
+			// 002 FR-106: 新規作成時は、対象フォルダの内容にかかわらず
+			// 常に同じ統合リソースを書き出す。種別による分岐は存在しない。
 			std::string body;
-			if (!LoadGitignoreResource(resourceId, body))
+			if (!LoadGitignoreResource(IDR_GITIGNORE, body))
 			{
 				errorMessage = _T(".gitignore の埋め込みリソースを読み出せませんでした。");
 				return false;
@@ -164,7 +158,7 @@ namespace GitignoreWriter
 			payload += body;
 		}
 
-		// 目印行の有無で追記済みかを判定する。これによりべき等性が成立する (FR-013)。
+		// 目印行の有無で追記済みかを判定する。これによりべき等性が成立する (001 FR-013 / 002 FR-106b)。
 		const std::string markSpecKit = ToUtf8Narrow(GITIGNORE_MARK_SPECKIT);
 		const std::string markProject = ToUtf8Narrow(GITIGNORE_MARK_PROJECT);
 		const std::string current(existing.GetString(), static_cast<size_t>(existing.GetLength()));
@@ -180,7 +174,7 @@ namespace GitignoreWriter
 
 		if (payload.empty())
 		{
-			// 既に本体も2ブロックも揃っている。何もしない (FR-013)。
+			// 既に本体も2ブロックも揃っている。何もしない (001 FR-013 / 002 FR-106b)。
 			return true;
 		}
 
