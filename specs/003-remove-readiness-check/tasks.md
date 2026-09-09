@@ -110,7 +110,7 @@ description: "準備状況の診断機能の廃止のタスクリスト"
 
 ## Phase 7: 通し実行
 
-- [ ] T023 [quickstart.md](./quickstart.md) の付録に従って `C:\work\test\test01` をリセットし、手順1〜7を通しで実行して「完了条件」の6項目をすべて確認する。T013〜T022 および Phase 6 の全タスクに依存
+- [X] T023 [quickstart.md](./quickstart.md) の付録に従って `C:\work\test\test01` をリセットし、手順1〜7を通しで実行して「完了条件」の6項目をすべて確認する。T013〜T022 および Phase 6 の全タスクに依存
 
 ---
 
