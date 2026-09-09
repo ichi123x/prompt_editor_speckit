@@ -301,7 +301,22 @@ namespace
 					   _T("Git のユーザー設定 (user.name / user.email) が必要です。"), sink);
 				return;
 			}
-			if (output.Find(_T("nothing to commit")) >= 0)
+			// 003 FR-210, FR-211: 判定文字列は推測ではなく実測に基づく。
+			//
+			// git はコミット対象が無いとき、リポジトリの状態によって2通りの文言を
+			// 出し分ける。実測した出力は次のとおり。
+			//
+			//  (a) 未追跡ファイルがある場合:
+			//        nothing added to commit but untracked files present (use "git add" to track)
+			//  (b) 作業ツリーがクリーンな場合:
+			//        nothing to commit, working tree clean
+			//
+			// 001 では (b) だけを想定して "nothing to commit" を探していたが、
+			// これは (a) の "nothing added to commit" の部分文字列ではないため
+			// 一致せず、「スキップ」とすべきところが「失敗」と表示されていた。
+			// 文字列を変更する場合は、実際に git を動かして出力を採取すること。
+			if (output.Find(_T("nothing added to commit")) >= 0
+				|| output.Find(_T("nothing to commit")) >= 0)
 			{
 				Finish(step, StepResult::Skipped,
 					   _T("コミットすべき変更がありませんでした。"), sink);

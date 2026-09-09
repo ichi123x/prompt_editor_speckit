@@ -9,7 +9,7 @@ description: "準備状況の診断機能の廃止のタスクリスト"
 
 **Prerequisites（前提条件）**: [plan.md](./plan.md)、[spec.md](./spec.md)、[research.md](./research.md)、[data-model.md](./data-model.md)、[contracts/ui-contract.md](./contracts/ui-contract.md)、[quickstart.md](./quickstart.md)
 
-**Tests（テスト）**: 仕様の「テスト方針」がテストを明示的に要求している。静的テスト（ST-201〜205）と動的テスト（DT-201〜208）を検証タスクとして含める。自動テストランナーは導入しないため、これらはコードではなく**実施手順**として遂行するタスクである。
+**Tests（テスト）**: 仕様の「テスト方針」がテストを明示的に要求している。静的テスト（ST-201〜206）と動的テスト（DT-201〜209）を検証タスクとして含める。自動テストランナーは導入しないため、これらはコードではなく**実施手順**として遂行するタスクである。
 
 **Organization（構成）**: タスクはユーザーストーリーごとにグループ化される。ただし本フィーチャーは**既存実装からの削除**が中心であり、削除作業そのものは分割できないため Phase 2 にまとめる。ユーザーストーリーのフェーズは主に検証で構成される。
 
@@ -91,7 +91,26 @@ description: "準備状況の診断機能の廃止のタスクリスト"
 
 - [ ] T021 [quickstart.md](./quickstart.md) 手順1の ST-203 を実施する。`Debug`/`Release` × `x64`/`x86` の4構成すべてで MSBuild が成功し、**未使用変数・未使用関数の警告が0件**であること。削除の消し残しはこの警告に現れる。`.sln` に渡すプラットフォーム名は `x86`（`Win32` では `error MSB4126`）。**ビルド前にアプリを終了させること**（`LNK1104` になる）。T011 に依存
 - [ ] T022 [P] [quickstart.md](./quickstart.md) 手順2の ST-205 を実施する。削除・変更した各箇所が FR-201〜FR-209 のどれに対応するかコード上で追跡できること。不足していればコメントを追加する。T012 に依存
-- [ ] T023 [quickstart.md](./quickstart.md) の付録に従って `C:\work\test\test01` をリセットし、手順1〜7を通しで実行して「完了条件」の6項目をすべて確認する。T013〜T022 に依存
+---
+
+## Phase 6: 欠陥修正 — コミット対象が無いときの結果表示（FR-210、FR-211）
+
+**目的**: 002 の手動テスト中に発見した、Git 手順の結果表示の誤りを修正する
+
+**発見の経緯**: `test01` に対する「生成」で Git 手順が「失敗」と表示され、内容欄に `On branch main Untracked files:...` が出た。データは何も壊れておらず（コミット1件、追記ブロック各1回のまま）、表示だけが誤っていた。実装は `nothing to commit` を探していたが、Git が実際に出力するのは `nothing added to commit but untracked files present` であり、前者は後者の部分文字列ではない。001 の実装時に Git の出力を実測せず推測で書いた箇所である。
+
+**このフェーズは診断削除と独立している。** `SetupRunner.cpp` は Phase 2 で触らないファイルのため、Phase 2〜5 と並行して進めてよい。
+
+- [X] T024 `MFCApplication1/SetupRunner.cpp` の `RunInitGit()` で、コミットの結果判定に用いる文字列を実測値に合わせて修正する。`nothing to commit` は Git の実出力 `nothing added to commit but untracked files present` の部分文字列ではないため一致しない。**両方の文言に対応させること** — リポジトリの状態によって Git は `nothing to commit, working tree clean` と `nothing added to commit but untracked files present` を出し分けるため、`nothing added to commit` と `nothing to commit` の双方を判定対象とする。該当時は `StepResult::Skipped` とし、理由欄に「コミットすべき変更がありませんでした。」を表示する（FR-210、FR-211）
+- [X] T025 `MFCApplication1/SetupRunner.cpp` の該当箇所に、**判定文字列は推測ではなく実測に基づくこと**をコメントで明記する。実測した Git の出力例を添え、文字列を変更する場合は再度実測するよう促す（FR-211 / [spec.md](./spec.md)「コミット対象が無いときの結果表示について」）。T024 に依存
+- [X] T026 ST-206 を実施する。`MFCApplication1/SetupRunner.cpp` の判定文字列を、実環境の Git が出力する文言と突き合わせる。コミット対象が無い状態を実際に作って `git commit` を実行し、出力に判定文字列が含まれることを確認する。T024 に依存
+- [ ] T027 DT-209 を実施する。既にコミット済みで `.gitignore` の内容がコミット済みのものと同一、かつ未追跡ファイルが存在するフォルダに対して「生成」を押し、Git 手順が**「失敗」ではなく「スキップ」**と表示されることを確認する。理由欄に「コミットすべき変更がありませんでした。」が出ること。T024、T016 に依存
+
+---
+
+## Phase 7: 通し実行
+
+- [ ] T023 [quickstart.md](./quickstart.md) の付録に従って `C:\work\test\test01` をリセットし、手順1〜7を通しで実行して「完了条件」の6項目をすべて確認する。T013〜T022 および Phase 6 の全タスクに依存
 
 ---
 
