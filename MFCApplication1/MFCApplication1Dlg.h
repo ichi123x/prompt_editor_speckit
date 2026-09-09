@@ -6,7 +6,6 @@
 #include <vector>
 #include "TargetFolderState.h"
 #include "SetupRunner.h"
-#include "ReadinessChecker.h"
 
 // ワーカースレッドからダイアログへ進捗を通知するためのメッセージ (research.md R-002)。
 // SendMessage ではなく PostMessage を使い、ワーカーが UI スレッドの応答を待つことによる
@@ -62,7 +61,6 @@ protected:
 	// --- イベントハンドラ ---
 	afx_msg void OnBnClickedButtonBrowse();     // 001 FR-001, FR-002
 	afx_msg void OnBnClickedButtonGenerate();   // 001 FR-004〜FR-016 / 002 FR-102, FR-103, FR-105
-	afx_msg void OnBnClickedButtonDiagnose();   // 001 FR-017〜FR-021
 	afx_msg LRESULT OnStepFinishedMessage(WPARAM wParam, LPARAM lParam);
 	afx_msg LRESULT OnSetupCompletedMessage(WPARAM wParam, LPARAM lParam);
 
@@ -74,7 +72,6 @@ protected:
 	void SetControlsEnabled(bool enabled);                   // 002 contracts「3.2 実行中に無効化するコントロール」
 	bool ValidateBeforeGenerate(TargetFolderState& state);    // 002 FR-102, FR-103 / 001 FR-015, FR-016
 	void ShowCompletionGuide();                              // 001 FR-011（定型の完了メッセージ）
-	void ShowReadinessGuide(const std::vector<ReadinessItem>& items);  // 001 FR-022
 
 	static UINT AFX_CDECL SetupThreadProc(LPVOID param);
 };

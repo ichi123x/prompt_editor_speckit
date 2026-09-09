@@ -14,12 +14,12 @@
 
 // SDDプロジェクトのベース作成ツールのコントロール
 // 1002 と 1003 は種別選択のラジオボタンだったが 002 FR-101 で廃止し、
+// 1005 は診断ボタンだったが 003 FR-201 で廃止し、
 // 定義も削除した (002 FR-107: 不要となったリソース定義を残さない)。
 // 削除した ID は再利用しない。
 #define IDC_EDIT_TARGET_PATH			1000
 #define IDC_BUTTON_BROWSE				1001
 #define IDC_BUTTON_GENERATE				1004
-#define IDC_BUTTON_DIAGNOSE				1005
 #define IDC_LIST_RESULT					1006
 #define IDC_STATIC_GUIDE				1007
 

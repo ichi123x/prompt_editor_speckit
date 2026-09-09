@@ -71,7 +71,6 @@ BEGIN_MESSAGE_MAP(CMFCApplication1Dlg, CDialogEx)
 	ON_WM_QUERYDRAGICON()
 	ON_BN_CLICKED(IDC_BUTTON_BROWSE, &CMFCApplication1Dlg::OnBnClickedButtonBrowse)
 	ON_BN_CLICKED(IDC_BUTTON_GENERATE, &CMFCApplication1Dlg::OnBnClickedButtonGenerate)
-	ON_BN_CLICKED(IDC_BUTTON_DIAGNOSE, &CMFCApplication1Dlg::OnBnClickedButtonDiagnose)
 	ON_MESSAGE(WM_APP_STEP_FINISHED, &CMFCApplication1Dlg::OnStepFinishedMessage)
 	ON_MESSAGE(WM_APP_SETUP_COMPLETED, &CMFCApplication1Dlg::OnSetupCompletedMessage)
 END_MESSAGE_MAP()
@@ -123,6 +122,7 @@ BOOL CMFCApplication1Dlg::OnInitDialog()
 	SetControlsEnabled(true);
 
 	// 002 FR-107: 種別に言及する初期案内文は削除済み。
+	// 003 FR-206: 診断への言及も含まない。
 	SetGuideText(_T("対象フォルダを選び、「生成」を押してください。")
 				 _T("\r\n対象のプロジェクトは、あらかじめ Visual Studio 2022 などのウィザードで作成し、そのフォルダに配置しておいてください。"));
 
@@ -183,8 +183,11 @@ HCURSOR CMFCApplication1Dlg::OnQueryDragIcon()
 // SDDプロジェクトのベース作成ツール
 /////////////////////////////////////////////////////////////////////////////
 
-// 結果一覧の初期化 (FR-011, FR-019 / research.md R-009)。
-// 手順結果と診断結果は、いずれも「名称／状態／補足」の3列構造なので同じ一覧を共用する。
+// 結果一覧の初期化 (001 FR-011)。
+//
+// 003 FR-202, FR-203: 診断の7項目判定と、その結果に基づく手順案内は廃止した。
+// 001 では手順結果と診断結果がこの一覧を共用していたが、003 以降は手順結果の
+// 表示にのみ使う。共用をやめるだけで、列定義も表示処理も変更していない。
 void CMFCApplication1Dlg::InitResultList()
 {
 	m_listResult.SetExtendedStyle(m_listResult.GetExtendedStyle()
@@ -229,20 +232,19 @@ void CMFCApplication1Dlg::SetGuideText(const CString& text)
 	SetDlgItemText(IDC_STATIC_GUIDE, text);
 }
 
-// 実行中に無効化するコントロール (002 contracts/ui-contract.md「3.2」)。
+// 実行中に無効化するコントロール (003 FR-209 / contracts/ui-contract.md「3.3」)。
 //
-// 生成・診断ボタンだけでなく、**参照ボタンも無効化する**。処理中にフォルダを
+// 生成ボタンだけでなく、**参照ボタンも無効化する**。処理中にフォルダを
 // 変更されると、ワーカースレッドの処理対象と画面表示が食い違うためである。
 //
-// 002 でラジオボタンを配列から取り除いた際、IDC_BUTTON_BROWSE を巻き添えで
-// 消してはならない (002 research.md R-104(1))。DT-107 がこれを検証する。
+// 003 で診断ボタンを配列から取り除いた際、IDC_BUTTON_BROWSE を巻き添えで
+// 消してはならない (003 research.md R-204(1))。DT-207 がこれを検証する。
 void CMFCApplication1Dlg::SetControlsEnabled(bool enabled)
 {
 	const BOOL flag = enabled ? TRUE : FALSE;
 
 	CWnd* controls[] = {
 		GetDlgItem(IDC_BUTTON_GENERATE),
-		GetDlgItem(IDC_BUTTON_DIAGNOSE),
 		GetDlgItem(IDC_BUTTON_BROWSE)
 	};
 
@@ -279,6 +281,9 @@ void CMFCApplication1Dlg::OnBnClickedButtonBrowse()
 // フォルダを選択してもボタンが押せなくなる (DT-003 の確認項目(d))。
 bool CMFCApplication1Dlg::ValidateBeforeGenerate(TargetFolderState& state)
 {
+	// 003 FR-207: 検証チェーンの5段階とその順序は、診断の廃止によって
+	// 変更してはならない。以下の順序は 001・002 から一切変えていない。
+
 	// 1. フォルダ未選択 (US1-4 / DT-003)
 	if (m_targetPath.IsEmpty())
 	{
@@ -417,8 +422,12 @@ LRESULT CMFCApplication1Dlg::OnSetupCompletedMessage(WPARAM, LPARAM)
 	return 0;
 }
 
-// 完了時の定型案内 (FR-011)。
-// 診断結果に応じて内容が変わる手順案内 (FR-022) とは別物で、ここでは診断結果を参照しない。
+// 完了時の定型案内 (001 FR-011 / 003 FR-205)。
+//
+// 003 FR-205: 診断機能の廃止後も、この案内は残さなければならない。SDD化の後に
+// 次の手順を伝える唯一の手段であり、002 FR-110〜112 で読みやすさとコピー可能性を
+// 確保したばかりである。名前の似た診断結果向けの案内関数は 003 で削除したが、
+// こちらは診断結果を参照しないため影響を受けない。
 void CMFCApplication1Dlg::ShowCompletionGuide()
 {
 	bool anyFailed = false;
@@ -448,83 +457,3 @@ void CMFCApplication1Dlg::ShowCompletionGuide()
 	}
 	SetGuideText(guide);
 }
-
-// 「準備状況を診断」ボタン (FR-017〜FR-021)。
-//
-// 重要: この経路では TargetFolder::IsWritable を呼ばない。一時ファイルの作成が
-// FR-020 の読み取り専用要件に違反するため。
-void CMFCApplication1Dlg::OnBnClickedButtonDiagnose()
-{
-	if (m_running)
-	{
-		return;
-	}
-
-	if (m_targetPath.IsEmpty())
-	{
-		AfxMessageBox(_T("対象フォルダを選択してください。"), MB_OK | MB_ICONINFORMATION);
-		return;
-	}
-
-	ClearResultList();
-
-	const std::vector<ReadinessItem> items = ReadinessChecker::Check(m_targetPath);
-	for (const auto& item : items)
-	{
-		CString name;
-		name.Format(_T("%d. %s"), item.id, static_cast<LPCTSTR>(item.displayName));
-		AppendResultRow(name,
-						ReadinessChecker::VerdictDisplayName(item.verdict),
-						item.nextAction);
-	}
-
-	ShowReadinessGuide(items);
-}
-
-// 診断結果に基づく手順案内 (FR-022)。
-// 自動実行できない4工程を順に並べ、完了済みの工程は完了として区別して示す。
-void CMFCApplication1Dlg::ShowReadinessGuide(const std::vector<ReadinessItem>& items)
-{
-	bool constitutionReady = false;   // 項目5
-	bool claudeMdReady = false;       // 項目6
-	bool stackReady = false;          // 項目7
-	bool allMet = true;
-
-	for (const auto& item : items)
-	{
-		if (item.verdict != ReadinessVerdict::Met)
-		{
-			allMet = false;
-		}
-		switch (item.id)
-		{
-		case 5: constitutionReady = (item.verdict == ReadinessVerdict::Met); break;
-		case 6: claudeMdReady = (item.verdict == ReadinessVerdict::Met); break;
-		case 7: stackReady = (item.verdict == ReadinessVerdict::Met); break;
-		default: break;
-		}
-	}
-
-	if (allMet)
-	{
-		SetGuideText(_T("7項目すべてを満たしています。")
-					 _T("VS Code の Claude パネルで /speckit-specify を実行して、最初の機能仕様から始められます。"));
-		return;
-	}
-
-	// 完了済みの工程には [済] を、未完了には [未] を付けて区別する。
-	CString guide = _T("残りの工程は Claude Code との対話が必要です。次の順に進めてください。\r\n");
-	guide += _T(" 1. [未] テスト方針を決める（何をテスト対象にし、何を対象外にするか）\r\n");
-	guide += constitutionReady
-		? _T(" 2. [済] /speckit-constitution — 憲章は制定済みです\r\n")
-		: _T(" 2. [未] /speckit-constitution — 上の判断を原則として書く\r\n");
-	guide += claudeMdReady
-		? _T(" 3. [済] /init — CLAUDE.md は憲章より新しい状態です\r\n")
-		: _T(" 3. [未] /init — 憲章を反映した CLAUDE.md に更新する\r\n");
-	guide += stackReady
-		? _T(" 4. [済] 技術スタックは CLAUDE.md に記録済みです")
-		: _T(" 4. [未] 言語・ビルド構成・テストランナーを CLAUDE.md に明記してコミットする");
-
-	SetGuideText(guide);
-}
-

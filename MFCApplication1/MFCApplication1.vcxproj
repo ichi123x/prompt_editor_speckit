@@ -186,7 +186,6 @@
     <ClInclude Include="framework.h" />
     <ClInclude Include="GitignoreWriter.h" />
     <ClInclude Include="ProcessRunner.h" />
-    <ClInclude Include="ReadinessChecker.h" />
     <ClInclude Include="SetupRunner.h" />
     <ClInclude Include="TargetFolderState.h" />
     <ClInclude Include="MFCApplication1.h" />
@@ -199,7 +198,6 @@
     <ClCompile Include="GitignoreWriter.cpp" />
     <ClCompile Include="MFCApplication1.cpp" />
     <ClCompile Include="ProcessRunner.cpp" />
-    <ClCompile Include="ReadinessChecker.cpp" />
     <ClCompile Include="SetupRunner.cpp" />
     <ClCompile Include="TargetFolderState.cpp" />
     <ClCompile Include="MFCApplication1Dlg.cpp" />

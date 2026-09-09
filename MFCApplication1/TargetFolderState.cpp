@@ -93,7 +93,6 @@ namespace TargetFolder
 		// Spec Kit の足場と .gitignore。
 		state.hasSpecifyDir = DirectoryExists(CombinePath(state.path, _T(".specify")));
 		state.hasClaudeDir = DirectoryExists(CombinePath(state.path, _T(".claude")));
-		state.hasGitignore = FileExists(CombinePath(state.path, _T(".gitignore")));
 
 		// Git の状態 (research.md R-006)。
 		// --is-inside-work-tree は親ディレクトリを遡って探索するため、これだけでは

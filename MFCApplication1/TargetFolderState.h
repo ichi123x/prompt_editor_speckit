@@ -27,7 +27,7 @@ struct TargetFolderState
 	bool hasProjectMarker = false;
 	bool hasSpecifyDir = false;    // .specify が存在するか
 	bool hasClaudeDir = false;     // .claude が存在するか
-	bool hasGitignore = false;     // .gitignore が存在するか
+	// 003 FR-204: .gitignore の存在フラグは、診断の削除により読み出し元が無くなったため廃止した。
 	GitState gitState = GitState::NotRepository;
 	CString gitRoot;               // リポジトリのルート。非リポジトリなら空
 	int commitCount = 0;           // コミット件数。取得できなければ 0
