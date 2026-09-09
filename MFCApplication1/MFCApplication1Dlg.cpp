@@ -73,6 +73,8 @@ BEGIN_MESSAGE_MAP(CMFCApplication1Dlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BUTTON_GENERATE, &CMFCApplication1Dlg::OnBnClickedButtonGenerate)
 	ON_MESSAGE(WM_APP_STEP_FINISHED, &CMFCApplication1Dlg::OnStepFinishedMessage)
 	ON_MESSAGE(WM_APP_SETUP_COMPLETED, &CMFCApplication1Dlg::OnSetupCompletedMessage)
+	ON_WM_SIZE()                                    // 004 FR-301
+	ON_WM_GETMINMAXINFO()                           // 004 FR-306
 END_MESSAGE_MAP()
 
 
@@ -125,6 +127,9 @@ BOOL CMFCApplication1Dlg::OnInitDialog()
 	// 003 FR-206: 診断への言及も含まない。
 	SetGuideText(_T("対象フォルダを選び、「生成」を押してください。")
 				 _T("\r\n対象のプロジェクトは、あらかじめ Visual Studio 2022 などのウィザードで作成し、そのフォルダに配置しておいてください。"));
+
+	// 004 FR-301: 追従テーブルの初期化。すべての記録が済んだ最後に m_layoutReady を立てる。
+	InitAnchors();
 
 	return TRUE;  // フォーカスをコントロールに設定した場合を除き、TRUE を返します。
 }
@@ -183,6 +188,11 @@ HCURSOR CMFCApplication1Dlg::OnQueryDragIcon()
 // SDDプロジェクトのベース作成ツール
 /////////////////////////////////////////////////////////////////////////////
 
+// 004 FR-308: 結果一覧の列幅の比率（%）。初期化時と再配置時の両方から参照する。
+// 2箇所に分けて持つと、列を追加したり比率を変えたりしたときに片方だけ直す誤りが起きる
+// (research.md R-305(2))。
+static const int kColumnRatio[3] = { 40, 20, 40 };
+
 // 結果一覧の初期化 (001 FR-011)。
 //
 // 003 FR-202, FR-203: 診断の7項目判定と、その結果に基づく手順案内は廃止した。
@@ -197,9 +207,38 @@ void CMFCApplication1Dlg::InitResultList()
 	m_listResult.GetClientRect(&rect);
 	const int width = rect.Width() > 0 ? rect.Width() : 600;
 
-	m_listResult.InsertColumn(0, _T("項目"), LVCFMT_LEFT, width * 40 / 100);
-	m_listResult.InsertColumn(1, _T("結果"), LVCFMT_LEFT, width * 20 / 100);
-	m_listResult.InsertColumn(2, _T("内容"), LVCFMT_LEFT, width * 40 / 100);
+	m_listResult.InsertColumn(0, _T("項目"), LVCFMT_LEFT, width * kColumnRatio[0] / 100);
+	m_listResult.InsertColumn(1, _T("結果"), LVCFMT_LEFT, width * kColumnRatio[1] / 100);
+	m_listResult.InsertColumn(2, _T("内容"), LVCFMT_LEFT, width * kColumnRatio[2] / 100);
+}
+
+// 004 FR-308: 結果一覧の列幅を一覧の幅に追従させる。
+//
+// 再配置のたびに無条件で再計算する。「幅が変わったときだけ」の条件判定は設けない。
+// 前回の幅を保持する状態が増えるうえ、「変わったのに走らない」誤りは表示の破綻として
+// 現れるためである (contracts/ui-contract.md「6. 再計算のタイミング」)。
+//
+// この方式では、ユーザーが列の境界をドラッグして手で調整した列幅は次のリサイズで
+// 既定の比率に戻る。列幅の手動調整を保持する要件は無いため許容する。
+void CMFCApplication1Dlg::UpdateResultListColumns()
+{
+	if (m_listResult.GetSafeHwnd() == nullptr)
+	{
+		return;
+	}
+
+	CRect rect;
+	m_listResult.GetClientRect(&rect);
+	const int width = rect.Width();
+	if (width <= 0)
+	{
+		return;
+	}
+
+	for (int i = 0; i < 3; ++i)
+	{
+		m_listResult.SetColumnWidth(i, width * kColumnRatio[i] / 100);
+	}
 }
 
 void CMFCApplication1Dlg::ClearResultList()
@@ -456,4 +495,169 @@ void CMFCApplication1Dlg::ShowCompletionGuide()
 			static_cast<LPCTSTR>(m_workerPath));
 	}
 	SetGuideText(guide);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+// 004: ダイアログのリサイズ追従
+/////////////////////////////////////////////////////////////////////////////
+
+// 追従テーブルの初期化 (004 FR-301 / data-model.md「テーブルの内容（8行）」)。
+//
+// OnInitDialog の最後から呼ぶ。各コントロールの初期矩形と、初期クライアントサイズ、
+// 最小ウィンドウサイズを記録し、最後に m_layoutReady を立てる。
+//
+// 画面上の8コントロールを**すべて**登録する。1つでも漏れるとそのコントロールだけ
+// 元の位置に取り残され、他と重なるかウィンドウの外へはみ出す。Fixed のラベルと
+// 生成ボタンも省略しない。除外すると ST-303 が「意図的に固定」と「定義を忘れた」を
+// 区別できなくなる (contracts/ui-contract.md「2. ラベルのID」)。
+void CMFCApplication1Dlg::InitAnchors()
+{
+	m_anchors.clear();
+
+	// 004 FR-302〜305: コントロールごとの追従方針。
+	const AnchorEntry table[] = {
+		{ IDC_STATIC_TARGET_LABEL, AnchorMode::Fixed,                CRect() },  // FR-305
+		{ IDC_EDIT_TARGET_PATH,    AnchorMode::StretchH,             CRect() },  // FR-302
+		{ IDC_BUTTON_BROWSE,       AnchorMode::AnchorRight,          CRect() },  // FR-304
+		{ IDC_BUTTON_GENERATE,     AnchorMode::Fixed,                CRect() },  // FR-305
+		{ IDC_LIST_RESULT,         AnchorMode::StretchBoth,          CRect() },  // FR-302, FR-303
+		{ IDC_STATIC_GUIDE,        AnchorMode::AnchorBottomStretchH, CRect() },  // FR-302, FR-303
+		{ IDOK,                    AnchorMode::AnchorBottomRight,    CRect() },  // FR-303, FR-304
+		{ IDCANCEL,                AnchorMode::AnchorBottomRight,    CRect() }   // FR-303, FR-304
+	};
+
+	for (const AnchorEntry& src : table)
+	{
+		CWnd* control = GetDlgItem(src.id);
+		if (control == nullptr)
+		{
+			continue;
+		}
+
+		AnchorEntry entry = src;
+		control->GetWindowRect(&entry.initialRect);
+		ScreenToClient(&entry.initialRect);
+		m_anchors.push_back(entry);
+	}
+
+	CRect clientRect;
+	GetClientRect(&clientRect);
+	m_initialClientSize = CSize(clientRect.Width(), clientRect.Height());
+
+	// 004 FR-306: 記録するのはウィンドウ全体のサイズ。ptMinTrackSize が
+	// ウィンドウ全体の寸法を指すため、クライアントサイズを渡すと枠とタイトルバーの
+	// 分だけ小さい下限になってしまう (research.md R-304)。
+	CRect windowRect;
+	GetWindowRect(&windowRect);
+	m_minWindowSize = CSize(windowRect.Width(), windowRect.Height());
+
+	// すべての記録が済んでから立てる。これ以前に OnSize が走ってはならない。
+	m_layoutReady = true;
+}
+
+// 追従テーブルに従ってコントロールを再配置する (004 FR-302〜305)。
+//
+// dx / dy は**初期クライアントサイズからの差分**である。前回サイズからの相対計算に
+// してはならない。相対計算は丸め誤差が累積し、拡大と縮小を繰り返すと位置がじわじわ
+// ずれる。初期値からの絶対差分なら、どんな経路でリサイズしても同じサイズには同じ配置が
+// 対応し、SC-304（元のサイズに戻すと配置も戻る）が構造的に保証される
+// (research.md R-303)。
+void CMFCApplication1Dlg::ApplyAnchors()
+{
+	if (!m_layoutReady || m_anchors.empty())
+	{
+		return;
+	}
+
+	CRect clientRect;
+	GetClientRect(&clientRect);
+	const int dx = clientRect.Width() - m_initialClientSize.cx;
+	const int dy = clientRect.Height() - m_initialClientSize.cy;
+
+	for (const AnchorEntry& entry : m_anchors)
+	{
+		CWnd* control = GetDlgItem(entry.id);
+		if (control == nullptr)
+		{
+			continue;
+		}
+
+		CRect r = entry.initialRect;
+
+		switch (entry.mode)
+		{
+		case AnchorMode::Fixed:
+			continue;                                   // 何もしない (FR-305)
+		case AnchorMode::StretchH:
+			r.right += dx;                              // 幅だけ増減 (FR-302)
+			break;
+		case AnchorMode::AnchorRight:
+			r.OffsetRect(dx, 0);                        // 右端との距離を保つ (FR-304)
+			break;
+		case AnchorMode::StretchBoth:
+			r.right += dx;                              // 幅と高さの両方 (FR-302, FR-303)
+			r.bottom += dy;
+			break;
+		case AnchorMode::AnchorBottomStretchH:
+			r.OffsetRect(0, dy);                        // 下端との距離を保ち幅は増減
+			r.right += dx;                              // (FR-302, FR-303)
+			break;
+		case AnchorMode::AnchorBottomRight:
+			r.OffsetRect(dx, dy);                       // 右下との距離を保つ (FR-303, FR-304)
+			break;
+		}
+
+		control->SetWindowPos(nullptr, r.left, r.top, r.Width(), r.Height(),
+							  SWP_NOZORDER | SWP_NOACTIVATE);
+	}
+
+	// 004 FR-308: 一覧の幅が変わったので列幅も追従させる。
+	UpdateResultListColumns();
+}
+
+// ウィンドウのサイズ変更 (004 FR-301, FR-310, FR-311)。
+void CMFCApplication1Dlg::OnSize(UINT nType, int cx, int cy)
+{
+	CDialogEx::OnSize(nType, cx, cy);
+
+	// 004 FR-311: 最小化中は再配置しない。クライアント領域の幅と高さが 0 になり、
+	// そのまま差分を計算するとコントロールの幅・高さが負になって復帰時に配置が
+	// 破綻する。復帰時は SIZE_RESTORED で再度 OnSize が呼ばれるため支障はない
+	// (contracts/ui-contract.md「5. 最小化時の早期リターン」)。
+	if (nType == SIZE_MINIMIZED)
+	{
+		return;
+	}
+
+	// OnSize はダイアログの初期化中にも呼ばれる。その時点ではコントロールが未生成で
+	// GetDlgItem が nullptr を返すため、フラグが立つまで何もしない (research.md R-301)。
+	if (!m_layoutReady)
+	{
+		return;
+	}
+
+	// 004 FR-309: 導入処理の実行中にリサイズされても処理を中断しない。
+	//
+	// ワーカースレッドはコントロールを直接操作せず PostMessage で結果を送るだけなので
+	// (001 research.md R-002)、この再配置と結果一覧への行追加は競合しない。
+	// **追加の排他制御を導入してはならない** — 不要なロックは処理の停止を招く
+	// (research.md R-305(1))。
+	ApplyAnchors();
+}
+
+// ウィンドウの最小サイズ (004 FR-306, FR-307)。
+//
+// 下限は初期のウィンドウサイズと同一とする。初期サイズは 001 の設計時点で全コントロールが
+// 収まるよう決めたものなので、これを下限にすれば FR-307（下限でもすべて操作可能）が
+// 自動的に満たされる。
+void CMFCApplication1Dlg::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
+{
+	if (m_layoutReady && lpMMI != nullptr)
+	{
+		lpMMI->ptMinTrackSize.x = m_minWindowSize.cx;
+		lpMMI->ptMinTrackSize.y = m_minWindowSize.cy;
+	}
+
+	CDialogEx::OnGetMinMaxInfo(lpMMI);
 }

@@ -35,9 +35,9 @@ description: "ダイアログのリサイズ追従のタスクリスト"
 
 **目的**: ラベルにIDを割り当て、追従テーブルから参照できるようにする
 
-- [ ] T001 `MFCApplication1/Resource.h` に `IDC_STATIC_TARGET_LABEL`（1008）を追加し、`_APS_NEXT_CONTROL_VALUE` を 1009 へ更新する（FR-301 / [contracts/ui-contract.md](./contracts/ui-contract.md)「2. ラベルのID」）
-- [ ] T002 `MFCApplication1/MFCApplication1.rc` のラベル「対象フォルダ:」の ID を `IDC_STATIC` から `IDC_STATIC_TARGET_LABEL` へ差し替える。**位置と大きさ (7, 10, 45, 8) は変更しない**。他のコントロールのIDは一切変更しない。T001 に依存
-- [ ] T003 [quickstart.md](./quickstart.md) 手順0に従い `C:\work\test\test01` を初期状態へ戻す。**ソリューション本体（`test01.sln` 等）を消さないよう、実行前にパスを確認すること**
+- [X] T001 `MFCApplication1/Resource.h` に `IDC_STATIC_TARGET_LABEL`（1008）を追加し、`_APS_NEXT_CONTROL_VALUE` を 1009 へ更新する（FR-301 / [contracts/ui-contract.md](./contracts/ui-contract.md)「2. ラベルのID」）
+- [X] T002 `MFCApplication1/MFCApplication1.rc` のラベル「対象フォルダ:」の ID を `IDC_STATIC` から `IDC_STATIC_TARGET_LABEL` へ差し替える。**位置と大きさ (7, 10, 45, 8) は変更しない**。他のコントロールのIDは一切変更しない。T001 に依存
+- [X] T003 [quickstart.md](./quickstart.md) 手順0に従い `C:\work\test\test01` を初期状態へ戻す。**ソリューション本体（`test01.sln` 等）を消さないよう、実行前にパスを確認すること**
 
 **チェックポイント**: ラベルが `GetDlgItem` で取得できる状態。ビルドは通る
 
@@ -47,17 +47,17 @@ description: "ダイアログのリサイズ追従のタスクリスト"
 
 **目的**: 追従方針の定義、テーブル、再配置処理を実装する。両ユーザーストーリーが依存する
 
-- [ ] T004 `MFCApplication1/MFCApplication1Dlg.h` に `AnchorMode` 列挙（`Fixed`・`StretchH`・`AnchorRight`・`StretchBoth`・`AnchorBottomStretchH`・`AnchorBottomRight` の6値）を定義する。各値の意味を [data-model.md](./data-model.md)「1. AnchorMode」の表に従いコメントで記載する（FR-301〜305）
-- [ ] T005 `MFCApplication1/MFCApplication1Dlg.h` に `AnchorEntry` 構造（`id`・`mode`・`initialRect`）を定義する（[data-model.md](./data-model.md)「2. AnchorEntry」）。T004 に依存
-- [ ] T006 `MFCApplication1/MFCApplication1Dlg.h` にメンバ4件を追加する — `m_anchors`（`AnchorEntry` の配列）、`m_initialClientSize`、`m_minWindowSize`、`m_layoutReady`。**`m_minWindowSize` はクライアント領域ではなくウィンドウ全体のサイズを保持する**（`ptMinTrackSize` がウィンドウ全体の寸法を指すため。[research.md](./research.md) R-304）。T005 に依存
-- [ ] T007 `MFCApplication1/MFCApplication1Dlg.h` に `OnSize` と `OnGetMinMaxInfo` の宣言、および再配置処理のヘルパー関数の宣言を追加する。T006 に依存
-- [ ] T008 `MFCApplication1/MFCApplication1Dlg.cpp` のメッセージマップに `ON_WM_SIZE()` と `ON_WM_GETMINMAXINFO()` を追加する。T007 に依存
-- [ ] T009 `MFCApplication1/MFCApplication1Dlg.cpp` の `OnInitDialog()` の**最後**に、追従テーブルの初期化を実装する。[data-model.md](./data-model.md)「テーブルの内容（8行）」の8コントロールすべてを登録し、各コントロールの初期矩形を `GetWindowRect` + `ScreenToClient` でクライアント座標として記録する。あわせて `m_initialClientSize` と `m_minWindowSize` を記録し、**最後に `m_layoutReady` を true にする**。**8行すべてを登録すること** — 1つでも漏れるとそのコントロールだけ元の位置に取り残され、他と重なるかウィンドウの外へはみ出す。`Fixed` のラベルと生成ボタンも省略せず登録する（FR-301 / ST-303 / [research.md](./research.md) R-302）。T008 に依存
-- [ ] T010 `MFCApplication1/MFCApplication1Dlg.cpp` に再配置処理を実装する。`dx = 現在のクライアント幅 - m_initialClientSize.cx`、`dy = 現在の高さ - m_initialClientSize.cy` を求め、テーブルを走査して `mode` に応じ `SetWindowPos` で再配置する。横方向はパス欄・一覧・案内欄の幅を増減させ（FR-302）、縦方向は一覧の高さを増減させ案内欄とボタンを移動させる（FR-303）。右端のコントロールは右端との距離を保ち大きさを変えず（FR-304）、左端のコントロールは位置も大きさも変えない（FR-305）。**必ず初期矩形からの差分で計算すること** — 前回サイズからの相対計算にすると丸め誤差が累積し、拡大と縮小を繰り返すと位置がじわじわずれる。初期値からの絶対差分なら、同じウィンドウサイズには常に同じ配置が対応し、SC-304 が構造的に保証される（[research.md](./research.md) R-303）。FR-302〜305。T009 に依存
-- [ ] T011 `MFCApplication1/MFCApplication1Dlg.cpp` に `OnSize()` を実装する。**`m_layoutReady` が false の間は何もせず早期リターンする** — `OnSize` はダイアログの初期化中にも呼ばれ、その時点ではコントロールが未生成で `GetDlgItem` が `nullptr` を返すため、これを怠るとアクセス違反になる（[research.md](./research.md) R-301）。**あわせて `nType` が `SIZE_MINIMIZED` のときも早期リターンする** — 最小化中はクライアント領域の幅と高さが 0 になり、そのまま差分を計算するとコントロールの幅・高さが負になって復帰時に配置が破綻する（FR-311 / [contracts/ui-contract.md](./contracts/ui-contract.md)「5. 最小化時の早期リターン」）。復帰時は `SIZE_RESTORED` で再度 `OnSize` が呼ばれるため、最小化中に何もしなくても支障はない。両方の早期リターンを通過したら T010 の再配置処理を呼ぶ。FR-301、FR-310、FR-311。T010 に依存
-- [ ] T012 `MFCApplication1/MFCApplication1Dlg.cpp` に `OnGetMinMaxInfo()` を実装し、`ptMinTrackSize` に `m_minWindowSize` を設定する（FR-306、FR-307 / [contracts/ui-contract.md](./contracts/ui-contract.md)「4. 最小サイズの契約」）。T006 に依存
-- [ ] T013 `MFCApplication1/MFCApplication1Dlg.cpp` の結果一覧の列幅計算を共通化する。現在 `InitResultList()` が持つ 40% / 20% / 40% の比率を**1箇所にまとめ**、初期化時と再配置時の両方から参照できるようにする。再配置処理から呼んで列幅を追従させる。**再配置のたびに無条件で再計算する** — 「幅が変わったときだけ」の条件判定は設けない。前回の幅を保持する状態が増えるうえ、「変わったのに走らない」誤りは表示の破綻として現れるため（[contracts/ui-contract.md](./contracts/ui-contract.md)「6. 再計算のタイミング」）。ユーザーが手で調整した列幅は次のリサイズで既定の比率に戻るが、これは許容する。**比率を2箇所に分けて持たないこと** — 列を追加したり比率を変えたりしたときに片方だけ直す誤りが起きる（FR-308 / [research.md](./research.md) R-305(2)）。T010 に依存
-- [ ] T014 追加した各箇所に、対応する FR 番号（FR-301〜FR-310）をコメントで記載する。憲法 原則IV（変更の追跡可能性）に基づき、静的テスト ST-305 で検査する。T004〜T013 に依存
+- [X] T004 `MFCApplication1/MFCApplication1Dlg.h` に `AnchorMode` 列挙（`Fixed`・`StretchH`・`AnchorRight`・`StretchBoth`・`AnchorBottomStretchH`・`AnchorBottomRight` の6値）を定義する。各値の意味を [data-model.md](./data-model.md)「1. AnchorMode」の表に従いコメントで記載する（FR-301〜305）
+- [X] T005 `MFCApplication1/MFCApplication1Dlg.h` に `AnchorEntry` 構造（`id`・`mode`・`initialRect`）を定義する（[data-model.md](./data-model.md)「2. AnchorEntry」）。T004 に依存
+- [X] T006 `MFCApplication1/MFCApplication1Dlg.h` にメンバ4件を追加する — `m_anchors`（`AnchorEntry` の配列）、`m_initialClientSize`、`m_minWindowSize`、`m_layoutReady`。**`m_minWindowSize` はクライアント領域ではなくウィンドウ全体のサイズを保持する**（`ptMinTrackSize` がウィンドウ全体の寸法を指すため。[research.md](./research.md) R-304）。T005 に依存
+- [X] T007 `MFCApplication1/MFCApplication1Dlg.h` に `OnSize` と `OnGetMinMaxInfo` の宣言、および再配置処理のヘルパー関数の宣言を追加する。T006 に依存
+- [X] T008 `MFCApplication1/MFCApplication1Dlg.cpp` のメッセージマップに `ON_WM_SIZE()` と `ON_WM_GETMINMAXINFO()` を追加する。T007 に依存
+- [X] T009 `MFCApplication1/MFCApplication1Dlg.cpp` の `OnInitDialog()` の**最後**に、追従テーブルの初期化を実装する。[data-model.md](./data-model.md)「テーブルの内容（8行）」の8コントロールすべてを登録し、各コントロールの初期矩形を `GetWindowRect` + `ScreenToClient` でクライアント座標として記録する。あわせて `m_initialClientSize` と `m_minWindowSize` を記録し、**最後に `m_layoutReady` を true にする**。**8行すべてを登録すること** — 1つでも漏れるとそのコントロールだけ元の位置に取り残され、他と重なるかウィンドウの外へはみ出す。`Fixed` のラベルと生成ボタンも省略せず登録する（FR-301 / ST-303 / [research.md](./research.md) R-302）。T008 に依存
+- [X] T010 `MFCApplication1/MFCApplication1Dlg.cpp` に再配置処理を実装する。`dx = 現在のクライアント幅 - m_initialClientSize.cx`、`dy = 現在の高さ - m_initialClientSize.cy` を求め、テーブルを走査して `mode` に応じ `SetWindowPos` で再配置する。横方向はパス欄・一覧・案内欄の幅を増減させ（FR-302）、縦方向は一覧の高さを増減させ案内欄とボタンを移動させる（FR-303）。右端のコントロールは右端との距離を保ち大きさを変えず（FR-304）、左端のコントロールは位置も大きさも変えない（FR-305）。**必ず初期矩形からの差分で計算すること** — 前回サイズからの相対計算にすると丸め誤差が累積し、拡大と縮小を繰り返すと位置がじわじわずれる。初期値からの絶対差分なら、同じウィンドウサイズには常に同じ配置が対応し、SC-304 が構造的に保証される（[research.md](./research.md) R-303）。FR-302〜305。T009 に依存
+- [X] T011 `MFCApplication1/MFCApplication1Dlg.cpp` に `OnSize()` を実装する。**`m_layoutReady` が false の間は何もせず早期リターンする** — `OnSize` はダイアログの初期化中にも呼ばれ、その時点ではコントロールが未生成で `GetDlgItem` が `nullptr` を返すため、これを怠るとアクセス違反になる（[research.md](./research.md) R-301）。**あわせて `nType` が `SIZE_MINIMIZED` のときも早期リターンする** — 最小化中はクライアント領域の幅と高さが 0 になり、そのまま差分を計算するとコントロールの幅・高さが負になって復帰時に配置が破綻する（FR-311 / [contracts/ui-contract.md](./contracts/ui-contract.md)「5. 最小化時の早期リターン」）。復帰時は `SIZE_RESTORED` で再度 `OnSize` が呼ばれるため、最小化中に何もしなくても支障はない。両方の早期リターンを通過したら T010 の再配置処理を呼ぶ。FR-301、FR-310、FR-311。T010 に依存
+- [X] T012 `MFCApplication1/MFCApplication1Dlg.cpp` に `OnGetMinMaxInfo()` を実装し、`ptMinTrackSize` に `m_minWindowSize` を設定する（FR-306、FR-307 / [contracts/ui-contract.md](./contracts/ui-contract.md)「4. 最小サイズの契約」）。T006 に依存
+- [X] T013 `MFCApplication1/MFCApplication1Dlg.cpp` の結果一覧の列幅計算を共通化する。現在 `InitResultList()` が持つ 40% / 20% / 40% の比率を**1箇所にまとめ**、初期化時と再配置時の両方から参照できるようにする。再配置処理から呼んで列幅を追従させる。**再配置のたびに無条件で再計算する** — 「幅が変わったときだけ」の条件判定は設けない。前回の幅を保持する状態が増えるうえ、「変わったのに走らない」誤りは表示の破綻として現れるため（[contracts/ui-contract.md](./contracts/ui-contract.md)「6. 再計算のタイミング」）。ユーザーが手で調整した列幅は次のリサイズで既定の比率に戻るが、これは許容する。**比率を2箇所に分けて持たないこと** — 列を追加したり比率を変えたりしたときに片方だけ直す誤りが起きる（FR-308 / [research.md](./research.md) R-305(2)）。T010 に依存
+- [X] T014 追加した各箇所に、対応する FR 番号（FR-301〜FR-310）をコメントで記載する。憲法 原則IV（変更の追跡可能性）に基づき、静的テスト ST-305 で検査する。T004〜T013 に依存
 
 **チェックポイント**: リサイズに追従し、最小サイズが制限された状態。ビルドが通る
 
@@ -69,12 +69,12 @@ description: "ダイアログのリサイズ追従のタスクリスト"
 
 **独立したテスト**: アプリを起動してウィンドウの右下をドラッグで広げ、結果一覧の幅と高さが追従することを確認し、続いて元のサイズまで縮めて追従して戻ることを確認する
 
-- [ ] T015 [US1] [quickstart.md](./quickstart.md) 手順2の ST-301（追従処理の存在）と ST-303（**追従方針の網羅**）を実施する。`.rc` のダイアログ内コントロール8件すべてに追従方針が定義されていることを確認する。**未定義が1件でもあれば不合格** — そのコントロールだけ取り残される。T014 に依存
-- [ ] T016 [US1] [quickstart.md](./quickstart.md) 手順3の DT-301・DT-304 を実施する。横に広げてパス欄・結果一覧・案内欄の幅が広がること、参照ボタンが右端との距離を保って移動すること、生成ボタンが動かないことを確認する。T014、T003 に依存
-- [ ] T017 [US1] [quickstart.md](./quickstart.md) 手順4の DT-302・DT-305 を実施する。縦に広げて結果一覧の高さが伸びること、案内欄が下へ移動すること（高さは変わらない）、OK・キャンセルが右下の隅との距離を保って移動することを確認する。あわせて**スクロールなしで見える行数が増えている**ことを確認する（SC-302）。増えた高さをすべて一覧に振る設計の効果がここに出る。T014 に依存
-- [ ] T018 [US1] [quickstart.md](./quickstart.md) 手順5の DT-303 と **SC-304** を実施する。縮小に追従し、はみ出しも重なりも起きないこと（SC-303）。**拡大と縮小を何度か繰り返してから元のサイズに戻し、位置がずれていないこと**を確認する。ずれる場合は T010 が前回サイズからの相対計算になっている。T016、T017 に依存
-- [ ] T019 [P] [US1] [quickstart.md](./quickstart.md) 手順7の DT-308 と **SC-301** を実施する。結果一覧の列幅が一覧の幅に追従し、右側に無駄な余白や不要な横スクロールバーが出ないこと。「内容」列で読める文字数が増えていることを確認する。T013、T016 に依存
-- [ ] T020 [P] [US1] [quickstart.md](./quickstart.md) 手順8の DT-309 を実施する。最大化・最小化からの復帰で配置が崩れないことを確認する（FR-310）。**最小化してタスクバーへ格納し、元に戻したときにコントロールが正しい位置にあること**を必ず確認する。最小化中の再配置をスキップしていないと、幅や高さが負になって復帰時に破綻する（FR-311）。T014 に依存
+- [X] T015 [US1] [quickstart.md](./quickstart.md) 手順2の ST-301（追従処理の存在）と ST-303（**追従方針の網羅**）を実施する。`.rc` のダイアログ内コントロール8件すべてに追従方針が定義されていることを確認する。**未定義が1件でもあれば不合格** — そのコントロールだけ取り残される。T014 に依存
+- [X] T016 [US1] [quickstart.md](./quickstart.md) 手順3の DT-301・DT-304 を実施する。横に広げてパス欄・結果一覧・案内欄の幅が広がること、参照ボタンが右端との距離を保って移動すること、生成ボタンが動かないことを確認する。T014、T003 に依存
+- [X] T017 [US1] [quickstart.md](./quickstart.md) 手順4の DT-302・DT-305 を実施する。縦に広げて結果一覧の高さが伸びること、案内欄が下へ移動すること（高さは変わらない）、OK・キャンセルが右下の隅との距離を保って移動することを確認する。あわせて**スクロールなしで見える行数が増えている**ことを確認する（SC-302）。増えた高さをすべて一覧に振る設計の効果がここに出る。T014 に依存
+- [X] T018 [US1] [quickstart.md](./quickstart.md) 手順5の DT-303 と **SC-304** を実施する。縮小に追従し、はみ出しも重なりも起きないこと（SC-303）。**拡大と縮小を何度か繰り返してから元のサイズに戻し、位置がずれていないこと**を確認する。ずれる場合は T010 が前回サイズからの相対計算になっている。T016、T017 に依存
+- [X] T019 [P] [US1] [quickstart.md](./quickstart.md) 手順7の DT-308 と **SC-301** を実施する。結果一覧の列幅が一覧の幅に追従し、右側に無駄な余白や不要な横スクロールバーが出ないこと。「内容」列で読める文字数が増えていることを確認する。T013、T016 に依存
+- [X] T020 [P] [US1] [quickstart.md](./quickstart.md) 手順8の DT-309 を実施する。最大化・最小化からの復帰で配置が崩れないことを確認する（FR-310）。**最小化してタスクバーへ格納し、元に戻したときにコントロールが正しい位置にあること**を必ず確認する。最小化中の再配置をスキップしていないと、幅や高さが負になって復帰時に破綻する（FR-311）。T014 に依存
 
 **チェックポイント**: ウィンドウのサイズ変更に全コントロールが追従する（MVP 達成）
 
@@ -86,8 +86,8 @@ description: "ダイアログのリサイズ追従のタスクリスト"
 
 **独立したテスト**: ウィンドウの右下をつまんで可能な限り小さくドラッグし、それ以上小さくならない下限が存在すること、その状態でもすべてのコントロールが見えて操作できることを確認する
 
-- [ ] T021 [US2] [quickstart.md](./quickstart.md) 手順2の ST-302（下限設定の存在）を実施する。`OnGetMinMaxInfo`・`ON_WM_GETMINMAXINFO`・`ptMinTrackSize`・`m_minWindowSize` がいずれも実装されていることを確認する。T012 に依存
-- [ ] T022 [US2] [quickstart.md](./quickstart.md) 手順6の DT-306・DT-307 を実施する。既定サイズより小さくできないこと、下限でもすべてのコントロールが見えてボタンがクリックでき、結果一覧に数行が表示できる高さがあることを確認する。**下限がクライアントサイズになっていると、枠とタイトルバーの分だけ小さくなりコントロールがはみ出す**（[research.md](./research.md) R-304）。T021 に依存
+- [X] T021 [US2] [quickstart.md](./quickstart.md) 手順2の ST-302（下限設定の存在）を実施する。`OnGetMinMaxInfo`・`ON_WM_GETMINMAXINFO`・`ptMinTrackSize`・`m_minWindowSize` がいずれも実装されていることを確認する。T012 に依存
+- [X] T022 [US2] [quickstart.md](./quickstart.md) 手順6の DT-306・DT-307 を実施する。既定サイズより小さくできないこと、下限でもすべてのコントロールが見えてボタンがクリックでき、結果一覧に数行が表示できる高さがあることを確認する。**下限がクライアントサイズになっていると、枠とタイトルバーの分だけ小さくなりコントロールがはみ出す**（[research.md](./research.md) R-304）。T021 に依存
 
 **チェックポイント**: 両ユーザーストーリーが独立して動作する
 
@@ -95,8 +95,8 @@ description: "ダイアログのリサイズ追従のタスクリスト"
 
 ## Phase 5: Polish & Cross-Cutting Concerns（仕上げと横断的関心事）
 
-- [ ] T023 [quickstart.md](./quickstart.md) 手順1の ST-304 を実施する。`Debug`/`Release` × `x64`/`x86` の4構成すべてで MSBuild が成功し、警告が0件であること。`.sln` に渡すプラットフォーム名は `x86`（`Win32` では `error MSB4126`）。**ビルド前にアプリを終了させること**（`LNK1104` になる）。T014 に依存
-- [ ] T024 [P] [quickstart.md](./quickstart.md) 手順2の ST-305 を実施する。追加・変更した各箇所が FR-301〜FR-310 のどれに対応するかコード上で追跡できること。不足していればコメントを追加する。T014 に依存
+- [X] T023 [quickstart.md](./quickstart.md) 手順1の ST-304 を実施する。`Debug`/`Release` × `x64`/`x86` の4構成すべてで MSBuild が成功し、警告が0件であること。`.sln` に渡すプラットフォーム名は `x86`（`Win32` では `error MSB4126`）。**ビルド前にアプリを終了させること**（`LNK1104` になる）。T014 に依存
+- [X] T024 [P] [quickstart.md](./quickstart.md) 手順2の ST-305 を実施する。追加・変更した各箇所が FR-301〜FR-310 のどれに対応するかコード上で追跡できること。不足していればコメントを追加する。T014 に依存
 - [ ] T025 [quickstart.md](./quickstart.md) 手順9の **DT-310（実行中のリサイズ・回帰確認）** を実施する。`test01` で「生成」を押し、処理中にウィンドウのサイズを変更して、処理が中断せず結果一覧への行追加が続くこと、処理中は生成・参照ボタンがグレーアウトのままで完了後に有効へ戻ることを確認する（FR-309、003 FR-209 の回帰）。**追加の排他制御を導入していないこと**も併せて確認する。ワーカーは `PostMessage` で結果を送るだけなので競合せず、不要なロックは処理の停止を招く（[research.md](./research.md) R-305(1)）。T014、T003 に依存
 - [ ] T026 [quickstart.md](./quickstart.md) 手順10の **SC-305（既存機能の回帰確認）** を実施する。001〜003 で合格していた項目が再現すること — SDD化の完走で4点セットが揃いコミット1件、再実行で全手順スキップ、未選択ガード、完了案内の可読性とコピー可能性。T025 に依存
 - [ ] T027 [quickstart.md](./quickstart.md) の付録に従って `C:\work\test\test01` をリセットし、手順1〜10 を通しで実行して「完了条件」の6項目をすべて確認する。**あわせて 002 の T033 と 003 の T023（いずれも通し実行）もこの機会に完了させる** — 004 で画面の挙動が変わるため、それぞれの時点で通しを回しても再実行になると判断して先送りしていた。T015〜T026 に依存

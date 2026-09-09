@@ -22,6 +22,10 @@
 #define IDC_BUTTON_GENERATE				1004
 #define IDC_LIST_RESULT					1006
 #define IDC_STATIC_GUIDE				1007
+// 004 FR-301: ラベルにも専用IDを与える。追従方針は Fixed（何もしない）で
+// 技術的にはIDが不要だが、追従テーブルに載せて ST-303（定義漏れの検出）を
+// 成立させるため。IDC_STATIC(-1) のままでは GetDlgItem で識別できない。
+#define IDC_STATIC_TARGET_LABEL			1008
 
 // 新しいオブジェクトの次の既定値
 //
@@ -29,7 +33,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 
 #define _APS_NEXT_RESOURCE_VALUE	130
-#define _APS_NEXT_CONTROL_VALUE		1008
+#define _APS_NEXT_CONTROL_VALUE		1009
 #define _APS_NEXT_SYMED_VALUE		101
 #define _APS_NEXT_COMMAND_VALUE		32771
 #endif
