@@ -71,12 +71,16 @@ foreach($w in 'OnGetMinMaxInfo','ON_WM_GETMINMAXINFO','ptMinTrackSize','m_minWin
 ```powershell
 $src = (Get-ChildItem MFCApplication1\*.h,MFCApplication1\*.cpp | ForEach-Object {
   [System.IO.File]::ReadAllText($_.FullName,[System.Text.Encoding]::UTF8) }) -join "`n"
-$rc = [System.IO.File]::ReadAllText((Resolve-Path 'MFCApplication1\MFCApplication1.rc'),[System.Text.Encoding]::Unicode)
+$lines = [System.IO.File]::ReadAllText((Resolve-Path 'MFCApplication1\MFCApplication1.rc'),[System.Text.Encoding]::Unicode) -split "`r`n"
 
-# .rc のダイアログ内コントロールを列挙
-$dlg = ($rc -split "`r`n" | Select-String 'IDD_MFCAPPLICATION1_DIALOG DIALOGEX' -Context 0,25).Context.PostContext
-$rcIds = $dlg | Where-Object { $_ -match 'IDC_|IDOK|IDCANCEL' } |
-  ForEach-Object { if($_ -match '(IDC_[A-Z_]+|IDOK|IDCANCEL)'){ $Matches[1] } } | Sort-Object -Unique
+# DIALOGEX から END までを行番号で切り出す（行数に依存しない）
+$start = ($lines | Select-String 'IDD_MFCAPPLICATION1_DIALOG DIALOGEX').LineNumber
+$end = $start; while($end -lt $lines.Count -and $lines[$end] -notmatch '^END'){ $end++ }
+$dlg = $lines[($start-1)..$end]
+
+# コントロール定義行だけを対象にする（コメント行を拾わない）
+$rcIds = $dlg | Where-Object { $_ -match '^\s*(LTEXT|EDITTEXT|PUSHBUTTON|DEFPUSHBUTTON|CONTROL|COMBOBOX|LISTBOX|GROUPBOX|CTEXT|RTEXT|ICON|SCROLLBAR)\s' } |
+  ForEach-Object { if($_ -match '(IDC_[A-Z_0-9]+|IDOK|IDCANCEL)'){ $Matches[1] } }
 
 "--- .rc のコントロール ({0}件) ---" -f $rcIds.Count
 $rcIds | ForEach-Object { "  $_" }
@@ -85,13 +89,17 @@ $rcIds | ForEach-Object { "  $_" }
 $missing = @()
 foreach($id in $rcIds){
   $found = $src -match ($id + '\s*,\s*AnchorMode::')
-  "  {0,-26} {1}" -f $id, $(if($found){'定義あり'}else{'★未定義'})
+  "  {0,-28} {1}" -f $id, $(if($found){'定義あり'}else{'★未定義'})
   if(-not $found){ $missing += $id }
 }
 "--- 判定: " + $(if($missing.Count -eq 0){'PASS（全コントロールに方針あり）'}else{'FAIL 未定義: ' + ($missing -join ', ')}) + " ---"
 ```
 
-**期待される結果**: `.rc` のコントロール8件すべてに追従方針が定義されている。
+**判定基準（FR-301 / ST-303）**: **`.rc` で検出された各IDが、追従テーブルに存在すること。** 件数の一致だけを条件にしてはならない。IDが入れ替わっても件数が同じなら通過してしまい、検査の意味が失われる。上のスクリプトは1件ずつ照合し、未定義があればそのIDを名指しする。
+
+**期待される結果**: 検出された全コントロール（実装後は `IDC_STATIC_TARGET_LABEL` を含む8件）に「定義あり」が並び、判定が PASS になる。
+
+**切り出しに `-Context` を使わない理由**: 当初は `Select-String -Context 0,25` で25行を切り出す実装だったが、現在 `DIALOGEX` から `END` までがちょうど25行で**余裕がゼロ**だった。T002（ラベルのID差し替え）と T014（FRコメントの追記）で必ず行数が増えるため、`END` が範囲外になりコントロールを拾い落とす。しかも壊れ方が「エラーで止まる」ではなく「拾い落として PASS を返す」ため、気づかないまま通過する。**定義漏れを検出するはずの検査が、逆に漏れを見逃す**ことになるため、行番号で `END` を探す方式へ改めた。
 
 **このテストの狙い**: コントロールごとに方針を定めるため、**1つ定義し忘れるとそのコントロールだけ元の位置に取り残され**、他と重なるかウィンドウの外へはみ出す。`Fixed` のコントロールもテーブルに載せているのは、「意図的に固定」と「定義を忘れた」を区別するためである（[contracts/ui-contract.md](./contracts/ui-contract.md)「2. ラベルのID」）。
 
