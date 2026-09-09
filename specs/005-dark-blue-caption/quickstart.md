@@ -55,16 +55,21 @@ Select-String -Path MFCApplication1\MFCApplication1Dlg.cpp -Pattern 'DwmSetWindo
 `0x001F3864`（RとBが逆）になっていないことを機械的に検出する。
 
 ```powershell
-$src = Get-Content MFCApplication1\MFCApplication1Dlg.cpp -Raw
-"誤った並び 0x001F3864 の出現: " + ([regex]::Matches($src,'0x001F3864')).Count + "  （0 であること）"
-"正しい並び 0x0064381F の出現: " + ([regex]::Matches($src,'0x0064381F')).Count
-"RGB マクロの使用: " + ([regex]::Matches($src,'RGB\(\s*0x1F\s*,\s*0x38\s*,\s*0x64\s*\)')).Count
-"文字色（白）の定義: " + ([regex]::Matches($src,'0x00FFFFFF|RGB\(\s*0xFF\s*,\s*0xFF\s*,\s*0xFF\s*\)|RGB\(\s*255\s*,\s*255\s*,\s*255\s*\)')).Count
+# ST-403 と同じく、行頭が // のコメント行は除外する。
+# 「0x001F3864 と書くと R と B が入れ替わる」という警告コメントを実装側に
+# 残すため、コメントを含めて検索すると必ず不合格になる（実際にそうなった）。
+$src = (Get-Content MFCApplication1\MFCApplication1Dlg.cpp | Where-Object { $_.TrimStart() -notlike '//*' }) -join "`n"
+"誤った並び 0x001F3864          : " + ([regex]::Matches($src,'0x001F3864')).Count + "  （0 であること）"
+"正しい並び 0x0064381F          : " + ([regex]::Matches($src,'0x0064381F')).Count
+"RGB マクロ RGB(0x1F,0x38,0x64) : " + ([regex]::Matches($src,'RGB\(\s*0x1F\s*,\s*0x38\s*,\s*0x64\s*\)')).Count
+"文字色（白）の定義             : " + ([regex]::Matches($src,'0x00FFFFFF|RGB\(\s*0xFF\s*,\s*0xFF\s*,\s*0xFF\s*\)|RGB\(\s*255\s*,\s*255\s*,\s*255\s*\)')).Count
 ```
 
 **合格条件**: 誤った並びが0件で、かつ「正しい並び」か「RGB マクロ」のどちらかが1件以上あり、**文字色（白）の定義が1件以上ある**こと。
 
 **SC-402（コントラスト比 4.5:1 以上）はこの検査で担保される。** 背景 `#1F3864` と文字 `#FFFFFF` の2つが確定すれば比は約 11.5:1 に定まり、実行時に測り直す余地が無い。白以外の色に変えられた場合はこの検査が落ちる。
+
+> **コメント行の除外を外さないこと。** 実装側には「`0x001F3864` と書くと R と B が入れ替わる」という警告コメントを意図的に残してある。これは取り違えを防ぐための一次情報であり、消してはならない。検査のほうがコメントを除外する。
 
 ### ST-403: 再設定していない
 

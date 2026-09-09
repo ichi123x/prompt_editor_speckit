@@ -11,9 +11,24 @@
 #include "GitignoreWriter.h"
 #include "ProcessRunner.h"
 
+// 005 FR-401: タイトルバーの着色に DWM のウィンドウ属性を使う。
+// dwmapi.lib は .vcxproj ではなく #pragma でリンクする。.vcxproj に書くと
+// Debug/Release × x64/Win32 の4構成すべてに足す必要があり、1つ漏らすと
+// その構成だけリンクエラーになる (research.md R-406)。
+#include <dwmapi.h>
+#pragma comment(lib, "dwmapi.lib")
+
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
+
+// 005 FR-402, FR-403: タイトルバーの配色。
+// COLORREF のバイト順は 0x00BBGGRR であり #RRGGBB とは逆。RGB マクロを
+// 使うことで並べ替えの取り違えを構造的に防ぐ。#1F3864 をリテラルで書くと
+// 0x0064381F になる。0x001F3864 と書くと R と B が入れ替わり、濃い青の
+// つもりが茶色寄りの色になる (research.md R-402)。
+static const COLORREF kCaptionColor = RGB(0x1F, 0x38, 0x64);	// ネイビー #1F3864
+static const COLORREF kCaptionTextColor = RGB(0xFF, 0xFF, 0xFF);	// 白。背景とのコントラスト比は約 11.5:1 (SC-402)
 
 
 // アプリケーションのバージョン情報に使われる CAboutDlg ダイアログ
@@ -110,6 +125,34 @@ BOOL CMFCApplication1Dlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// 小さいアイコンの設定
 
 	SetWindowText(_T("SDDプロジェクトのベース作成ツール"));
+
+	// 005 FR-401, FR-402: タイトルバーを濃い青 (#1F3864) に、
+	// 005 FR-403: タイトル文字を白にする。文字色を指定しないと、利用者が
+	// ライトモードのときに文字が濃色で描かれ、濃紺の背景に埋もれて読めなくなる。
+	//
+	// 005 FR-404: ここで設定するのは、OnInitDialog がダイアログの表示より前に
+	// 走るため。既定色が一瞬見えてから塗り替わる、という見え方にならない。
+	//
+	// 005 FR-408, FR-409: 戻り値を意図的に見ない。着色できない環境
+	// (Windows 10 や Windows 11 ビルド 22000 未満) では E_INVALIDARG が返るだけで
+	// 例外も異常終了も起きないことを実測済み (research.md R-405)。無視すれば
+	// 「何も起こらなかった」のと同じになり、エラー表示もアプリの停止も生じない。
+	// 判定を書くと、そこから「失敗したら何かする」分岐が生えて FR-408 に反する。
+	//
+	// 005 FR-405, FR-406, FR-407, FR-410: ここで1回設定するだけでよく、
+	// 塗り直してはならない。DWM がウィンドウ属性として色を保持するため、
+	// 非アクティブ・最大化・最小化からの復帰・ライト/ダークモードの切り替えの
+	// いずれでも色は保たれる (research.md R-407, R-408 で実測)。
+	// したがって 004 の OnSize / OnGetMinMaxInfo には一切手を入れない。
+	// ここに再設定処理を足すと、004 のリサイズ追従に無関係な責務が混ざる。
+	//
+	// 005 FR-411: 着色するのはこのメインダイアログ1枚のみ。メッセージボックス、
+	// フォルダ選択ダイアログ、バージョン情報ダイアログは対象外であり、
+	// 他のウィンドウへ広げる共通の仕組みも作らない (contracts/ui-contract.md 4章)。
+	COLORREF captionColor = kCaptionColor;
+	COLORREF captionTextColor = kCaptionTextColor;
+	DwmSetWindowAttribute(GetSafeHwnd(), DWMWA_CAPTION_COLOR, &captionColor, sizeof(captionColor));
+	DwmSetWindowAttribute(GetSafeHwnd(), DWMWA_TEXT_COLOR, &captionTextColor, sizeof(captionTextColor));
 
 	// 結果一覧を3列のレポートビューとして初期化する (FR-011, FR-019 / research.md R-009)。
 	InitResultList();

@@ -64,6 +64,10 @@ msbuild MFCApplication1/MFCApplication1.vcxproj -p:Configuration=Debug -p:Platfo
 
 埋め込みリソースの検証は、ビルド済み exe から `FindResource` / `LoadResource` で取り出して行える（GUI 不要）。
 
+**画面の色は1ピクセルを採取して機械判定できる。** `DWMWA_CAPTION_COLOR` は設定専用で `DwmGetWindowAttribute` では読み戻せない（`E_INVALIDARG` が返る）ため、タイトルバーの色は `Graphics.CopyFromScreen` で採取して突き合わせる。採取位置はウィンドウ矩形の右端から 200・上端から 15 とし、タイトル文字とキャプションボタンの両方を避ける。最大化するとウィンドウ矩形は不可視の枠の分だけ画面外へ出る（実測 `L=-9 T=-9`）ので、座標は 0 以上へ丸めること。
+
+**ソースコードを文字列検索する検査は、コメント行を除外すること。** 「この書き方をしてはいけない」という警告コメントを実装側に残すと、検査がそのコメントを拾って必ず不合格になる。005 で実際に発生した。004 の ST-303 も同種の失敗をしている。
+
 ## アプリケーションのアーキテクチャ
 
 ダイアログ1枚（`IDD_MFCAPPLICATION1_DIALOG`）に、責務ごとの具象クラスを平坦に追加した構成。抽象基底クラス・インターフェース・ファクトリは意図的に導入していない（憲章 原則III のYAGNI）。
@@ -74,8 +78,7 @@ msbuild MFCApplication1/MFCApplication1.vcxproj -p:Configuration=Debug -p:Platfo
 | `TargetFolderState` | 対象フォルダから読み取った事実を表す構造。**導入処理と診断の双方が参照する唯一の事実源** |
 | `GitignoreWriter` | 埋め込みリソースから `.gitignore` を生成し、追記ブロックをべき等に適用 |
 | `SetupRunner` | SDD化の5手順を順に確認・実行。ワーカースレッドから呼ばれる |
-| `ReadinessChecker` | 準備完了チェックリスト7項目を判定。**読み取り専用** |
-| `MFCApplication1Dlg` | UI の結線、検証チェーン、ワーカースレッドの起動と完了処理 |
+| `MFCApplication1Dlg` | UI の結線、検証チェーン、ワーカースレッドの起動と完了処理、リサイズ追従、タイトルバーの着色 |
 
 ### 設計上、壊しやすい箇所
 
@@ -93,7 +96,7 @@ specify init . --integration claude --script ps --force --non-interactive
 
 `--non-interactive` を省くとパイプ接続時にプロンプト待ちでハングする。`--integration claude` を省くと非対話セッションでは Copilot が既定になる。`--force` を省くと非空ディレクトリで確認待ちになる。なお `specify init` 自体はネットワークを必要としない（テンプレートが CLI パッケージに同梱されている）。
 
-**処理中は4コントロールを無効化する** — 生成・診断・参照ボタン（ラジオボタンは 002 で廃止）。参照ボタンを外すと、処理中にフォルダを変更されてワーカースレッドの処理対象と画面表示が食い違う。
+**処理中は2コントロールを無効化する** — 生成ボタンと参照ボタン（ラジオボタンは 002 で、診断ボタンは 003 で廃止）。参照ボタンを外すと、処理中にフォルダを変更されてワーカースレッドの処理対象と画面表示が食い違う。
 
 **未選択エラーの経路で生成ボタンを無効化してはならない。** 二重実行防止はワーカースレッドが動作している間のみ適用される。ここで無効化すると、ユーザーがフォルダを選択してもボタンが押せなくなりアプリの再起動が必要になる。
 
@@ -102,6 +105,8 @@ specify init . --integration claude --script ps --force --non-interactive
 **診断は対象フォルダに一切書き込まない。** `TargetFolder::IsWritable()` は一時ファイルを作るため、診断の経路から呼び出してはならない。
 
 **Git 手順は既存の未コミット変更を巻き込まない。** ステージング前に `git status --porcelain` を確認し、他人の変更があれば `git add -A` を使わず `.gitignore` のみをステージする。
+
+**タイトルバーの色は `OnInitDialog` で1回設定するだけでよい。** `DwmSetWindowAttribute` に `DWMWA_CAPTION_COLOR` / `DWMWA_TEXT_COLOR` を渡す。DWM がウィンドウ属性として色を保持するため、非アクティブ・最大化・最小化からの復帰・ライト/ダークモードの切り替えのいずれでも色は保たれる。**`OnSize` などで塗り直してはならない** — 004 のリサイズ追従に無関係な責務が混ざる。戻り値は意図的に見ない。着色できない環境では `E_INVALIDARG` が返るだけで例外にならないため、無視すれば「何も起こらなかった」のと同じになる。
 
 **憲章の未対応 TODO を判定する際は HTML コメントを除外する。** `/speckit-constitution` は冒頭の Sync Impact Report に「削除した項目」としてプレースホルダー名（`[PRINCIPLE_5_NAME]` 等）を引用するため、除外しないと正しく制定された憲章を「未達」と誤判定する。
 
@@ -117,6 +122,8 @@ specify init . --integration claude --script ps --force --non-interactive
 新規ファイルを作ったら BOM を確認すること。`.rc` を PowerShell で編集する場合は `[System.Text.Encoding]::Unicode` で読み書きする。
 
 **PowerShell の `Add-Type` に渡す C# コードには日本語コメントを書かないこと。** 一時ファイル生成時に文字化けして改行が壊れ、コンパイルエラーになる。
+
+**日本語を含む `.ps1` は UTF-8 BOM 付きで保存すること。** Windows PowerShell 5.1 は BOM の無い `.ps1` をシステムの ANSI コードページとして読むため、UTF-8 のまま保存すると日本語が化けて構文エラーになる。Bash のヒアドキュメントで書いた場合は BOM が付かないので、後から付け直す必要がある。
 
 ## Spec Kit ワークフロー
 
@@ -146,8 +153,13 @@ specify init . --integration claude --script ps --force --non-interactive
 |---|---|
 | `specs/001-sdd-project-bootstrap/` | 本体の実装。5手順のSDD化、7項目の診断、手順案内 |
 | `specs/002-remove-kind-selection/` | プロジェクト種別（MFC/Web）の選択を廃止し、`.gitignore` を統合 |
+| `specs/003-remove-readiness-check/` | 「準備状況を診断」ボタンと7項目の診断機能を削除 |
+| `specs/004-resizable-dialog/` | ウィンドウのサイズ変更に全コントロールが追従。最小サイズを設定 |
+| `specs/005-dark-blue-caption/` | タイトルバーをネイビー `#1F3864`、文字を白にする |
 
-001 の要件を 002 が一部置き換えている。002 の spec 冒頭に対応表がある。設計文書は 001 の全文コピーではなく**差分のみ**を記述しているため、002 を読むときは 001 も併せて参照すること。
+**後の機能が前の機能の要件を一部置き換えている。** 各 spec の冒頭に対応表がある。設計文書は前機能の全文コピーではなく**差分のみ**を記述しているため、新しい番号から読むときは前の番号も併せて参照すること。
+
+001 の「7項目の診断」は 003 で廃止済みであり、現在のアプリには存在しない。
 
 ## 憲章
 
