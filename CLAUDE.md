@@ -133,6 +133,8 @@ specify init . --integration claude --script ps --force --non-interactive
 
 **PowerShell の `Add-Type` に渡す C# コードには日本語コメントを書かないこと。** 一時ファイル生成時に文字化けして改行が壊れ、コンパイルエラーになる。
 
+**Bash ツールから Python の日本語を出力するときは `PYTHONIOENCODING=utf-8` を付けること。** この環境の Python は `sys.stdout.encoding` が `cp932`（Shift-JIS）になっており、日本語を print すると Shift-JIS のバイト列で出る。受け取る側は UTF-8 として読むため文字化けする。`echo` は bash が直接出すので化けない。**なお `io.open(..., encoding='utf-8')` で読み書きするファイルの中身には影響しない** — 標準出力の表示だけの問題である。
+
 **日本語を含む `.ps1` は UTF-8 BOM 付きで保存すること。** Windows PowerShell 5.1 は BOM の無い `.ps1` をシステムの ANSI コードページとして読むため、UTF-8 のまま保存すると日本語が化けて構文エラーになる。Bash のヒアドキュメントで書いた場合は BOM が付かないので、後から付け直す必要がある。
 
 ## Spec Kit ワークフロー
