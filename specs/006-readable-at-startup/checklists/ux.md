@@ -26,8 +26,8 @@
 
 ## 要件の一貫性
 
-- [ ] CHK011 FR-504（6行分の高さ）と `data-model.md` 3章の表（案内欄 44 DLU = 5行分）が**矛盾していないか**? [Conflict, Spec §FR-504]
-- [ ] CHK012 spec・plan・research の間で、ウィンドウ寸法（972 x 423 px）と DPI の前提が一致しているか? [Consistency]
+- [ ] CHK011 FR-504（6行分の高さ）と `data-model.md` 3章の表が**矛盾していないか**? [Conflict, Spec §FR-504]
+- [ ] CHK012 spec・plan・research の間で、ウィンドウ寸法（972 x 437 px）と DPI の前提が一致しているか? [Consistency]
 - [ ] CHK013 「文言を変更しない」（FR-511）と「読める範囲を広げる」（FR-501）が、互いに矛盾しない形で書き分けられているか? [Consistency, Spec §FR-511]
 - [ ] CHK014 列幅比率の変更（FR-509）と 004 FR-308 の「比率を1箇所で定義する」契約が整合しているか? [Consistency, Spec §FR-509]
 
@@ -75,7 +75,8 @@
 - まだ明確化・修正・レビュアーによる評価が必要な項目はチェックしないままにすること
 - `/speckit-implement` はチェックリストのチェックボックス状態をゲートとして読み取るのみで、マーカーを変更してはならない
 - `checklists/requirements.md` は `/speckit-specify` と `/speckit-clarify` が管理する別のビルトインのライフサイクルを持つ
-- **CHK011 は既知の矛盾**である。`/speckit-clarify`（2026-09-10）で FR-504 を更新したが、`data-model.md` は 44 DLU のまま。`/speckit-converge` が T017 の本文に正しい数値を書いて回避しているが、文書間の矛盾自体は未解消
+- **CHK011 の矛盾は解消済み**（2026-09-11）。`/speckit-analyze` が 6ファイル19箇所の不整合として検出し、すべて実装値（案内欄 52 DLU、ダイアログ 224 DLU、ボタン y 203、ウィンドウ 972 x 437 px）に揃えた。レビュー時は現物を確認のうえ `[x]` を付けること
+- **`/speckit-converge` はこの種の矛盾を検出できない**（コード vs 要件の文面しか見ないため）。実際 2026-09-11 に converge は `✅ Converged` と報告したが、同時に analyze は CRITICAL 2件を含む19箇所を検出した。**2つのコマンドは補完関係にある**
 - **CHK026・CHK030 は既知のギャップ**である。アクセシビリティは spec に一言も無く、フォント環境の質問は clarify で打ち切りにより未回答（Deferred）
 - コメントや所見はインラインで追加すること
 - 項目は参照しやすいように連番になっている
