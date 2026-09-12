@@ -95,6 +95,31 @@ END_MESSAGE_MAP()
 
 // CMFCApplication1Dlg メッセージ ハンドラー
 
+// 005 FR-401〜404: タイトルバーを濃紺・文字を白にする。戻り値は意図的に見ない
+// (FR-408) — 着色できない環境では E_INVALIDARG が返るだけで何も起こらない
+// (research.md R-405)。
+//
+// 007 FR-701, FR-702: OnInitDialog だけでなく、フォルダ選択ダイアログ
+// (CFolderPickerDialog::DoModal()) を開く直前・閉じた直後にも呼ぶ。実機報告
+// では、この経路を通るとタイトルバーの色が既定色に戻ったまま復帰しなかった
+// (007 research.md R-701)。原因は特定できていないが、症状そのものを直接
+// 打ち消すため、呼び出し箇所を増やす形で対応する (R-702, R-705)。
+// OnActivate や WM_NCACTIVATE のような汎用的な契機では呼ばない — 対象を
+// メインダイアログとフォルダ選択ダイアログの経路だけに絞る (FR-704, FR-705)。
+//
+// 007 FR-703: 呼び出し箇所が増えても戻り値を判定する分岐は一切追加しない。
+// 着色できない環境で新たなエラー・警告が生じないことは、この方針そのもの
+// によって構造的に保証される。
+// 007 FR-706: 変更・追加した各箇所に対応する FR 番号をコメントで記載する
+// (憲章 原則IV)。
+void CMFCApplication1Dlg::ApplyCaptionColor()
+{
+	COLORREF captionColor = kCaptionColor;
+	COLORREF captionTextColor = kCaptionTextColor;
+	DwmSetWindowAttribute(GetSafeHwnd(), DWMWA_CAPTION_COLOR, &captionColor, sizeof(captionColor));
+	DwmSetWindowAttribute(GetSafeHwnd(), DWMWA_TEXT_COLOR, &captionTextColor, sizeof(captionTextColor));
+}
+
 BOOL CMFCApplication1Dlg::OnInitDialog()
 {
 	CDialogEx::OnInitDialog();
@@ -149,10 +174,10 @@ BOOL CMFCApplication1Dlg::OnInitDialog()
 	// 005 FR-411: 着色するのはこのメインダイアログ1枚のみ。メッセージボックス、
 	// フォルダ選択ダイアログ、バージョン情報ダイアログは対象外であり、
 	// 他のウィンドウへ広げる共通の仕組みも作らない (contracts/ui-contract.md 4章)。
-	COLORREF captionColor = kCaptionColor;
-	COLORREF captionTextColor = kCaptionTextColor;
-	DwmSetWindowAttribute(GetSafeHwnd(), DWMWA_CAPTION_COLOR, &captionColor, sizeof(captionColor));
-	DwmSetWindowAttribute(GetSafeHwnd(), DWMWA_TEXT_COLOR, &captionTextColor, sizeof(captionTextColor));
+	//
+	// 007 FR-701: 着色処理そのものは ApplyCaptionColor() に切り出した。
+	// OnBnClickedButtonBrowse からも呼ぶため (FR-701, FR-702)。
+	ApplyCaptionColor();
 
 	// 結果一覧を3列のレポートビューとして初期化する (FR-011, FR-019 / research.md R-009)。
 	InitResultList();
@@ -379,7 +404,18 @@ void CMFCApplication1Dlg::SetControlsEnabled(bool enabled)
 void CMFCApplication1Dlg::OnBnClickedButtonBrowse()
 {
 	CFolderPickerDialog dialog(m_targetPath, OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST, this);
-	if (dialog.DoModal() != IDOK)
+
+	// 007 FR-701: フォルダ選択ダイアログを開く直前にも再適用する。実機報告では
+	// ダイアログを開いた瞬間にタイトルバーの色が既定色に戻ることがあった
+	// (spec.md User Story 1 Acceptance Scenario 1 / research.md R-705)。
+	ApplyCaptionColor();
+	INT_PTR result = dialog.DoModal();
+
+	// 007 FR-701, FR-702: 返った直後にも再適用する。選択・キャンセルのどちらで
+	// 閉じた場合でも、早期 return より前に必ず呼ぶ (research.md R-702)。
+	ApplyCaptionColor();
+
+	if (result != IDOK)
 	{
 		// キャンセル時は表示中のパスを変更しない (FR-002 / US1-6 / DT-005)。
 		// ここで m_targetPath を消すと、一度選んだフォルダが未選択に戻ってしまう。

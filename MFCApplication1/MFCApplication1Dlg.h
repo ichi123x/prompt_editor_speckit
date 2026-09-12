@@ -102,6 +102,7 @@ protected:
 	afx_msg void OnGetMinMaxInfo(MINMAXINFO* lpMMI);              // 004 FR-306, FR-307
 
 	// --- ヘルパー ---
+	void ApplyCaptionColor();                                // 005 FR-401〜404 / 007 FR-701, FR-702（DoModal() 前後でも呼ぶ）
 	void InitResultList();                                   // 001 FR-011, FR-019
 	void ClearResultList();
 	void AppendResultRow(const CString& name, const CString& status, const CString& detail);
