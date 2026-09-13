@@ -127,6 +127,14 @@ specify init . --integration claude --script ps --force --non-interactive
 
 `--non-interactive` を省くとパイプ接続時にプロンプト待ちでハングする。`--integration claude` を省くと非対話セッションでは Copilot が既定になる。`--force` を省くと非空ディレクトリで確認待ちになる。なお `specify init` 自体はネットワークを必要としない（テンプレートが CLI パッケージに同梱されている）。
 
+**`claude` による `/init` の非対話実行には `--permission-mode bypassPermissions` が必須（013で導入）。** CLAUDE.md生成の実体はファイル書き込みを伴うツール呼び出しであり、既定の権限確認モードのままでは非対話実行時にプロンプト待ちで止まる（winget の ToS 同意プロンプトと同種の問題）。
+
+```
+claude --print /init --permission-mode bypassPermissions --output-format text
+```
+
+`--print`（`-p`）を省くと対話セッションとして起動してしまいパイプ経由の実行と噛み合わない。この手順は「Git 初期化と初回コミット」に依存させており（`dependsOn = StepId::InitGit`）、Git初期化が失敗していれば自動的にスキップされる。タイムアウトは他手順より長い15分（`/init`はLLM呼び出しを伴い実行時間が変動する。実測34〜58秒だが対象リポジトリが大きいほど伸びる）。CLAUDE.mdのコミットは`git add -A`ではなく`git add -- CLAUDE.md`と対象を明示し、他の未コミット変更を巻き込まない。
+
 **処理中は2コントロールを無効化する** — 生成ボタンと参照ボタン（ラジオボタンは 002 で、診断ボタンは 003 で廃止）。参照ボタンを外すと、処理中にフォルダを変更されてワーカースレッドの処理対象と画面表示が食い違う。
 
 **未選択エラーの経路で生成ボタンを無効化してはならない。** 二重実行防止はワーカースレッドが動作している間のみ適用される。ここで無効化すると、ユーザーがフォルダを選択してもボタンが押せなくなりアプリの再起動が必要になる。
@@ -202,6 +210,7 @@ specify init . --integration claude --script ps --force --non-interactive
 | `specs/010-specify-path-registration/` | `uv tool install`がPATHへ自動登録しないため、`uv tool update-shell`を追加してspecify CLI導入直後の失敗を修正 |
 | `specs/011-fix-error-message-truncation/` | 失敗理由の表示が装飾バナーに埋もれて実際のエラー内容が見えなくなる問題を、`Brief()`の段落単位抽出で修正 |
 | `specs/012-guide-claude-md-commit/` | 完了案内に`/init`実行直後のCLAUDE.mdコミット手順を追加。案内欄（`IDC_STATIC_GUIDE`）の高さも006 FR-507aに従い52→61 DLUへ拡張 |
+| `specs/013-automate-claude-init/` | 012で案内するだけだった`/init`実行とCLAUDE.mdコミットを、Git初期化に依存する6番目の導入手順として自動化。`.rc`の寸法変更は不要（006 FR-507aの見積もり上の余裕内） |
 
 **後の機能が前の機能の要件を一部置き換えている。** 各 spec の冒頭に対応表がある。設計文書は前機能の全文コピーではなく**差分のみ**を記述しているため、新しい番号から読むときは前の番号も併せて参照すること。
 

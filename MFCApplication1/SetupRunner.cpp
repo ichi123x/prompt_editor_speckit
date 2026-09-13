@@ -463,6 +463,91 @@ namespace
 		}
 		Finish(step, StepResult::Success, note, sink);
 	}
+
+	// 対象フォルダ直下に指定した名前のファイルが存在するか (013)。
+	// TargetFolderState は .specify/.claude 等の既存の事実しか持たないため、
+	// CLAUDE.md 用に拡張せず、GitignoreWriter.cpp/TargetFolderState.cpp と同じ
+	// GetFileAttributes の使い方でここに閉じたヘルパーとして持つ (原則III YAGNI)。
+	bool FileExists(const CString& folderPath, LPCTSTR fileName)
+	{
+		CString path = folderPath;
+		if (!path.IsEmpty() && path[path.GetLength() - 1] != _T('\\'))
+		{
+			path += _T('\\');
+		}
+		path += fileName;
+		DWORD attr = ::GetFileAttributes(path);
+		return attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY) == 0;
+	}
+
+	// --- 手順6: CLAUDE.md の生成とコミット (013、contracts/claude-init-contract.md) ---
+	//
+	// 本関数はいずれの失敗経路でも StepResult::Failed を返して呼び出し元 (RunAll) へ
+	// 復帰するのみであり、それ以前の手順 (Git初期化等、既存4手順) の結果を書き換えたり
+	// 取り消したりする処理は一切行わない。既存4手順のコードには一切触れないため、この
+	// 非ロールバック特性は追加コードを書かないことで自然に満たされる (FR-1308)。
+	void RunGenerateClaudeMd(SetupStep& step, const CString& folderPath, ISetupProgressSink* sink)
+	{
+		// FR-1303: 既に CLAUDE.md が存在する場合、内容の正しさは問わずスキップする。
+		// 他手順 (RunInitSpecKit の .specify/.claude 存在確認) と同じ「存在すれば
+		// 完了済みとみなす」設計に合わせる (research.md Assumptions)。
+		if (FileExists(folderPath, _T("CLAUDE.md")))
+		{
+			Finish(step, StepResult::Skipped, _T("CLAUDE.md は既に生成されています。"), sink);
+			return;
+		}
+
+		// FR-1304・FR-1309・FR-1310・R-1301: claude CLI を非対話・確認スキップモードで
+		// 実行し /init を実行させる。ProcessRunner 経由のため、PATH再読み込み(009)・
+		// タイムアウト監視(008)の仕組みをそのまま利用する。/init はLLM呼び出しを伴い
+		// 実行時間が変動するため (実測34〜58秒)、他手順より長い15分をタイムアウトとする
+		// (R-1305)。
+		ProcessResult init = ProcessRunner::Run(
+			_T("claude --print /init --permission-mode bypassPermissions --output-format text"),
+			folderPath, 15 * 60 * 1000);
+
+		// FR-1307: claude が PATH 上に見つからない場合は他手順と同じ様式で失敗にする。
+		if (!init.launched)
+		{
+			Finish(step, StepResult::Failed, CommandNotFoundReason(_T("claude")), sink);
+			return;
+		}
+		if (!init.Succeeded())
+		{
+			Finish(step, StepResult::Failed, Brief(init.output), sink);
+			return;
+		}
+
+		// FR-1305: コマンドが成功しても、実際に CLAUDE.md が生成されたことを確認する
+		// (RunInitSpecKit の .specify/.claude 存在確認と同じ二段判定)。
+		if (!FileExists(folderPath, _T("CLAUDE.md")))
+		{
+			Finish(step, StepResult::Failed,
+				   _T("/init は完了しましたが、CLAUDE.md を確認できませんでした。"), sink);
+			return;
+		}
+
+		// FR-1306・R-1304: CLAUDE.md のみを対象にステージする。RunInitGit が持つ
+		// 「git status を見て他人の変更を検出したら限定ステージングに切り替える」という
+		// 分岐は複製しない。対象ファイルが常に CLAUDE.md 1つに定まっているため、
+		// git add -A ではなく対象を明示するだけで他の未コミット変更を巻き込まずに済む。
+		ProcessResult add = ProcessRunner::Run(_T("git add -- CLAUDE.md"), folderPath, 60 * 1000);
+		if (!add.Succeeded())
+		{
+			Finish(step, StepResult::Failed, Brief(add.output), sink);
+			return;
+		}
+
+		ProcessResult commit = ProcessRunner::Run(
+			_T("git commit -m \"CLAUDE.md を追加\""), folderPath, 60 * 1000);
+		if (!commit.Succeeded())
+		{
+			Finish(step, StepResult::Failed, Brief(commit.output), sink);
+			return;
+		}
+
+		Finish(step, StepResult::Success, _T("CLAUDE.md を生成し、コミットしました。"), sink);
+	}
 }
 
 namespace SetupRunner
@@ -501,6 +586,15 @@ namespace SetupRunner
 		git.dependsOn = StepId::None;
 		steps.push_back(git);
 
+		// FR-1301・FR-1302: Git初期化の後に実行し、InitGitに依存する。InitGitが失敗した
+		// 場合は既存のDependencyFailed()/FR-012の仕組みにより自動的にスキップされる
+		// (R-1306)。
+		SetupStep claudeMd;
+		claudeMd.id = StepId::GenerateClaudeMd;
+		claudeMd.displayName = _T("CLAUDE.md の生成とコミット");
+		claudeMd.dependsOn = StepId::InitGit;
+		steps.push_back(claudeMd);
+
 		return steps;
 	}
 
@@ -534,6 +628,9 @@ namespace SetupRunner
 				break;
 			case StepId::InitGit:
 				RunInitGit(step, folderPath, sink);
+				break;
+			case StepId::GenerateClaudeMd:
+				RunGenerateClaudeMd(step, folderPath, sink);
 				break;
 			default:
 				break;
