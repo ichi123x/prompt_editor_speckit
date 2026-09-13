@@ -601,12 +601,19 @@ void CMFCApplication1Dlg::ShowCompletionGuide()
 	}
 	else
 	{
+		// FR-1201・FR-1202: 導入手順書(SpecKitVSCodesetup.pdf 手順08)では /init 実行の直後に
+		// 生成物をコミットする。手順2と手順3(旧)の間にこのコミット手順を挿入し、以降の番号を
+		// 1つずつ繰り下げる。既存の手順の文言・m_workerPath の埋め込み方法は変更しない。
+		// FR-1204: コマンド表記は SetupRunner.cpp の RunInitGit が使う git add -A /
+		// git commit -m "..." という既存の表記に合わせる。
+		// FR-1203: この分岐は anyFailed が偽の場合のみであり、失敗時の案内文には触れない。
 		guide.Format(
 			_T("Spec Kit の導入が完了しました。次の手順は Claude Code との対話が必要です。\r\n")
 			_T(" 1. VS Code で %s を開く（.specify と .claude が直下に見えるフォルダ）\r\n")
 			_T(" 2. Claude パネルで /init を実行し、CLAUDE.md を生成する\r\n")
-			_T(" 3. テスト方針を決め、/speckit-constitution で憲章を制定する\r\n")
-			_T(" 4. /init を再実行し、憲章を反映した CLAUDE.md に更新する"),
+			_T(" 3. 生成された CLAUDE.md をコミットする（git add -A / git commit -m \"CLAUDE.md を追加\"）\r\n")
+			_T(" 4. テスト方針を決め、/speckit-constitution で憲章を制定する\r\n")
+			_T(" 5. /init を再実行し、憲章を反映した CLAUDE.md に更新する"),
 			static_cast<LPCTSTR>(m_workerPath));
 	}
 	SetGuideText(guide);

@@ -201,6 +201,7 @@ specify init . --integration claude --script ps --force --non-interactive
 | `specs/009-refresh-path-after-install/` | 新規インストール直後にレジストリのPATHが同一プロセスへ反映されず後続手順が失敗する問題を修正 |
 | `specs/010-specify-path-registration/` | `uv tool install`がPATHへ自動登録しないため、`uv tool update-shell`を追加してspecify CLI導入直後の失敗を修正 |
 | `specs/011-fix-error-message-truncation/` | 失敗理由の表示が装飾バナーに埋もれて実際のエラー内容が見えなくなる問題を、`Brief()`の段落単位抽出で修正 |
+| `specs/012-guide-claude-md-commit/` | 完了案内に`/init`実行直後のCLAUDE.mdコミット手順を追加。案内欄（`IDC_STATIC_GUIDE`）の高さも006 FR-507aに従い52→61 DLUへ拡張 |
 
 **後の機能が前の機能の要件を一部置き換えている。** 各 spec の冒頭に対応表がある。設計文書は前機能の全文コピーではなく**差分のみ**を記述しているため、新しい番号から読むときは前の番号も併せて参照すること。
 
