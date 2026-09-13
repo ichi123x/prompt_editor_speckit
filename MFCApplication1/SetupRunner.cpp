@@ -502,8 +502,11 @@ namespace
 		// タイムアウト監視(008)の仕組みをそのまま利用する。/init はLLM呼び出しを伴い
 		// 実行時間が変動するため (実測34〜58秒)、他手順より長い15分をタイムアウトとする
 		// (R-1305)。
+		// FR-1401・FR-1402・FR-1403 (014、R-1401): プロンプトに日本語での指示を1つ
+		// 加えるだけで、生成されるCLAUDE.mdの本文が日本語になることを実機で確認した。
+		// それ以外のフラグ・タイムアウト・以降の処理は013から変更しない。
 		ProcessResult init = ProcessRunner::Run(
-			_T("claude --print /init --permission-mode bypassPermissions --output-format text"),
+			_T("claude --print \"/init のCLAUDE.mdは日本語で書いてください。\" --permission-mode bypassPermissions --output-format text"),
 			folderPath, 15 * 60 * 1000);
 
 		// FR-1307: claude が PATH 上に見つからない場合は他手順と同じ様式で失敗にする。

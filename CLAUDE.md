@@ -130,10 +130,12 @@ specify init . --integration claude --script ps --force --non-interactive
 **`claude` による `/init` の非対話実行には `--permission-mode bypassPermissions` が必須（013で導入）。** CLAUDE.md生成の実体はファイル書き込みを伴うツール呼び出しであり、既定の権限確認モードのままでは非対話実行時にプロンプト待ちで止まる（winget の ToS 同意プロンプトと同種の問題）。
 
 ```
-claude --print /init --permission-mode bypassPermissions --output-format text
+claude --print "/init のCLAUDE.mdは日本語で書いてください。" --permission-mode bypassPermissions --output-format text
 ```
 
 `--print`（`-p`）を省くと対話セッションとして起動してしまいパイプ経由の実行と噛み合わない。この手順は「Git 初期化と初回コミット」に依存させており（`dependsOn = StepId::InitGit`）、Git初期化が失敗していれば自動的にスキップされる。タイムアウトは他手順より長い15分（`/init`はLLM呼び出しを伴い実行時間が変動する。実測34〜58秒だが対象リポジトリが大きいほど伸びる）。CLAUDE.mdのコミットは`git add -A`ではなく`git add -- CLAUDE.md`と対象を明示し、他の未コミット変更を巻き込まない。
+
+**`/init`のプロンプトに日本語指示を加えないと、生成されるCLAUDE.mdの本文が英語になる（014で発見）。** 本アプリは憲章 原則II により UI・コメント・ドキュメントを日本語で統一しているが、`claude --print /init ...`だけでは応答言語は`claude`自身の判断に委ねられ、実機では英語になった。対策として、プロンプト文字列に「/init のCLAUDE.mdは日本語で書いてください。」という指示を続けて渡す（上記コマンド）。ただし`claude`自身が常に付与する定型ヘッダー2行（`# CLAUDE.md`、`This file provides guidance to Claude Code...`）は英語のままであり、これは正常（プロンプトの指示によらず固定）。生成物が実際に日本語かどうかを機械的に自動判定する手段は無いため、確認は目視（DT）に委ねている。
 
 **処理中は2コントロールを無効化する** — 生成ボタンと参照ボタン（ラジオボタンは 002 で、診断ボタンは 003 で廃止）。参照ボタンを外すと、処理中にフォルダを変更されてワーカースレッドの処理対象と画面表示が食い違う。
 
@@ -211,6 +213,7 @@ claude --print /init --permission-mode bypassPermissions --output-format text
 | `specs/011-fix-error-message-truncation/` | 失敗理由の表示が装飾バナーに埋もれて実際のエラー内容が見えなくなる問題を、`Brief()`の段落単位抽出で修正 |
 | `specs/012-guide-claude-md-commit/` | 完了案内に`/init`実行直後のCLAUDE.mdコミット手順を追加。案内欄（`IDC_STATIC_GUIDE`）の高さも006 FR-507aに従い52→61 DLUへ拡張 |
 | `specs/013-automate-claude-init/` | 012で案内するだけだった`/init`実行とCLAUDE.mdコミットを、Git初期化に依存する6番目の導入手順として自動化。`.rc`の寸法変更は不要（006 FR-507aの見積もり上の余裕内） |
+| `specs/014-japanese-claude-md/` | 013が自動生成するCLAUDE.mdの本文が英語になっていた問題を、`/init`のプロンプトに日本語指示を1つ加えることで解消 |
 
 **後の機能が前の機能の要件を一部置き換えている。** 各 spec の冒頭に対応表がある。設計文書は前機能の全文コピーではなく**差分のみ**を記述しているため、新しい番号から読むときは前の番号も併せて参照すること。
 
