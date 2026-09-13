@@ -21,19 +21,129 @@ namespace
 		return reason;
 	}
 
-	// 出力の先頭部分を理由欄へ載せるために切り詰める。
+	// FR-1102: 罫線描画文字 (Box Drawing, U+2500-257F) とブロック要素 (Block Elements,
+	// U+2580-259F) かどうかを判定する (research.md R-1103)。
+	bool IsDecorativeChar(WCHAR ch)
+	{
+		return (ch >= 0x2500 && ch <= 0x257F) || (ch >= 0x2580 && ch <= 0x259F);
+	}
+
+	// 1行から装飾文字を取り除いてTrimする。可視文字が残らなければ空文字列になる。
+	CString StripDecorativeChars(const CString& line)
+	{
+		CString result;
+		for (int i = 0; i < line.GetLength(); ++i)
+		{
+			WCHAR ch = line[i];
+			if (!IsDecorativeChar(ch))
+			{
+				result += ch;
+			}
+		}
+		result.Trim();
+		return result;
+	}
+
+	// CString::Tokenize は strtok 相当で連続する区切り文字をまとめて読み飛ばしてしまい、
+	// 空行を検出できない。段落の区切り判定に空行の連続数を使うため、空文字列の行も
+	// そのまま保持する素朴な分割を自前で行う。
+	std::vector<CString> SplitLines(const CString& text)
+	{
+		std::vector<CString> lines;
+		int start = 0;
+		int length = text.GetLength();
+		for (int i = 0; i <= length; ++i)
+		{
+			if (i == length || text[i] == _T('\n'))
+			{
+				lines.push_back(text.Mid(start, i - start));
+				start = i + 1;
+			}
+		}
+		return lines;
+	}
+
+	CString JoinWithSpace(const std::vector<CString>& parts)
+	{
+		CString joined;
+		for (size_t i = 0; i < parts.size(); ++i)
+		{
+			if (i > 0)
+			{
+				joined += _T(" ");
+			}
+			joined += parts[i];
+		}
+		return joined;
+	}
+
+	// 出力の先頭部分ではなく、実際に診断の役に立つ内容を理由欄へ載せるために整形する。
+	//
+	// FR-1101・FR-1102: specify等の一部の外部コマンドは、罫線・ブロック文字による装飾バナーを
+	// 出力の先頭に付けるため、単純な先頭切り詰めでは実際のエラー本文が失われる
+	// (research.md R-1101、実機の specify init で確認)。出力を行に分割し、各行から装飾文字を
+	// 取り除いたうえで、可視文字が残る行（内容行）だけを段落にまとめ、最後の段落を採用する。
+	// 罫線ボックス内部の余白として現れる空行1行だけでは段落の区切りとみなさず、2行以上
+	// 連続した空行でのみ区切る（research.md R-1102 — 区切りを空行1行にすると、タイトル行と
+	// 本文行が別の段落に分断され、最後の段落に肝心の見出しが含まれなくなることを実機データで確認済み）。
+	// FR-1104: 採用した段落は maxLength を超える場合その段落の先頭から切り詰める。
+	// FR-1105: 本関数の変更は SetupRunner.cpp 内に閉じ、ProcessRunner 側には一切影響しない。
 	CString Brief(const CString& output, int maxLength = 160)
 	{
-		CString text = output;
-		text.Replace(_T("\r\n"), _T(" "));
-		text.Replace(_T("\n"), _T(" "));
-		text.Replace(_T("\t"), _T(" "));
-		text.Trim();
-		if (text.GetLength() > maxLength)
+		// FR-1103: 装飾除去が効かない場合のフォールバック用に、既存どおりの正規化結果も用意する。
+		CString normalizedWhole = output;
+		normalizedWhole.Replace(_T("\r\n"), _T(" "));
+		normalizedWhole.Replace(_T("\n"), _T(" "));
+		normalizedWhole.Replace(_T("\t"), _T(" "));
+		normalizedWhole.Trim();
+
+		CString forSplit = output;
+		forSplit.Replace(_T("\r\n"), _T("\n"));
+		forSplit.Replace(_T("\t"), _T(" "));
+
+		std::vector<CString> paragraphs;
+		std::vector<CString> current;
+		int emptyRun = 0;
+		for (const CString& line : SplitLines(forSplit))
 		{
-			text = text.Left(maxLength) + _T("...");
+			CString stripped = StripDecorativeChars(line);
+			if (stripped.IsEmpty())
+			{
+				++emptyRun;
+				if (emptyRun >= 2 && !current.empty())
+				{
+					paragraphs.push_back(JoinWithSpace(current));
+					current.clear();
+				}
+			}
+			else
+			{
+				emptyRun = 0;
+				current.push_back(stripped);
+			}
 		}
-		return text;
+		if (!current.empty())
+		{
+			paragraphs.push_back(JoinWithSpace(current));
+		}
+
+		if (paragraphs.empty())
+		{
+			// FR-1103: 内容行が1つも無かった場合 (出力全体が装飾のみ) は、既存どおり
+			// 先頭から切り詰めたものにフォールバックする。
+			if (normalizedWhole.GetLength() > maxLength)
+			{
+				return normalizedWhole.Left(maxLength) + _T("...");
+			}
+			return normalizedWhole;
+		}
+
+		CString lastParagraph = paragraphs.back();
+		if (lastParagraph.GetLength() > maxLength)
+		{
+			return lastParagraph.Left(maxLength) + _T("...");
+		}
+		return lastParagraph;
 	}
 
 	void Finish(SetupStep& step, StepResult result, LPCTSTR reason, ISetupProgressSink* sink)

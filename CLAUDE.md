@@ -117,6 +117,8 @@ msbuild MFCApplication1/MFCApplication1.vcxproj -p:Configuration=Debug -p:Platfo
 
 **`uv tool install` はインストール先ディレクトリをレジストリのPATHへ自動登録しない（010で発見）。** 009の対策（レジストリPATHの再読み込み）は「レジストリに書かれているが反映されていない」ケースにしか効かず、「そもそもレジストリに書かれていない」ケースには無力。`uv tool install specify-cli` はspecify.exeを既定の `%USERPROFILE%\.local\bin` へ配置するだけで、そのディレクトリをPATHへ登録する処理を自動では行わない（`uv --help` にも該当フラグはない）。そのため、specify CLI導入直後の「Spec Kit 足場の配置」手順が「specifyが見つかりません」で失敗した。対策として `SetupRunner.cpp` の `RunInstallSpecify`（`uv tool install specify-cli` の成功直後）で `uv tool update-shell` を明示的に呼び、レジストリへの登録まで完結させる。この呼び出しの成否は判定に使わず、失敗しても手順2の結果には影響させない。009と異なりuvの `tool install` に固有の挙動であるため、`ProcessRunner::Run()` 側には汎用化せず `SetupRunner.cpp` 側で対応した。
 
+**失敗理由の表示（`Brief()`）は先頭ではなく「最後の段落」を切り詰める（011で発見）。** `specify init`等、一部の外部コマンドは罫線・ブロック文字（Box Drawing/Block Elements、U+2500〜U+259F）による装飾バナーを出力の先頭に付ける。単純に先頭160文字を切り詰めると、装飾バナーだけで予算を使い切り、実際のエラー本文（実機で確認した例: `specify init`の`claude not found`）が一切表示されない。対策として、出力を行に分割し各行から装飾文字を除去したうえで、内容が残る行を段落にまとめ、**最後の段落をその先頭から**切り詰める方式にした。単純に「装飾除去後のテキスト全体の末尾を採用する」という設計も検討したが、実機データで検証したところ、エラー見出しの後に続く説明文だけで予算を使い切ってしまい見出し自体が失われることが判明したため採用しなかった（`/speckit-analyze`で発見）。段落の区切りは、罫線ボックス内部の余白（空行1行）を誤って区切りと判定しないよう、**空行2行以上の連続でのみ**区切ると判定する。
+
 **`specify init` には4つのフラグがすべて必要**。1つでも欠けると壊れる。
 
 ```
@@ -198,6 +200,7 @@ specify init . --integration claude --script ps --force --non-interactive
 | `specs/008-fix-external-command-hang/` | uv導入(winget)の対話プロンプト無限ハングを修正し、`ProcessRunner`のタイムアウトをジョブオブジェクト＋監視スレッドで実効化 |
 | `specs/009-refresh-path-after-install/` | 新規インストール直後にレジストリのPATHが同一プロセスへ反映されず後続手順が失敗する問題を修正 |
 | `specs/010-specify-path-registration/` | `uv tool install`がPATHへ自動登録しないため、`uv tool update-shell`を追加してspecify CLI導入直後の失敗を修正 |
+| `specs/011-fix-error-message-truncation/` | 失敗理由の表示が装飾バナーに埋もれて実際のエラー内容が見えなくなる問題を、`Brief()`の段落単位抽出で修正 |
 
 **後の機能が前の機能の要件を一部置き換えている。** 各 spec の冒頭に対応表がある。設計文書は前機能の全文コピーではなく**差分のみ**を記述しているため、新しい番号から読むときは前の番号も併せて参照すること。
 
