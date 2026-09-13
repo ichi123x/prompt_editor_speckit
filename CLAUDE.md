@@ -109,6 +109,10 @@ msbuild MFCApplication1/MFCApplication1.vcxproj -p:Configuration=Debug -p:Platfo
 
 **`ProcessRunner` はパイプを読み出しながら子プロセスの終了を待つ。** 読み出さずに `WaitForSingleObject` すると、子プロセスがパイプバッファ（既定 4KB）を埋めた時点でデッドロックする。
 
+**`ProcessRunner` のタイムアウトは、読み出しループの中の時刻比較だけでは機能しない。** `ReadFile` は子プロセスが何か書き込むまで無条件にブロックするため、子プロセスが出力を止めて入力待ちなどで無応答になると、時刻比較のコード自体が一度も実行されない（008で発見）。実例: `winget install` が初回実行時に `msstore` ソースの利用規約同意プロンプトを表示し、本アプリの非対話実行では入力が届かず無期限にハングした。対策として、子プロセスを `CREATE_SUSPENDED` で起動してジョブオブジェクト（`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`）へ割り当てた上で `ResumeThread` し、別スレッドが `WaitForSingleObject(hProcess, timeoutMs)` でタイムアウトを監視して超過時に `TerminateJobObject` でプロセスツリーごと終了させる方式にした。`TerminateProcess` を直接プロセスへ呼ぶだけでは、子プロセスがさらに起動した孫プロセス（例: `cmd.exe` が起動した `ping.exe` 相当）が残存し得る。
+
+**winget を非対話実行する場合は `--accept-source-agreements --accept-package-agreements --source winget` が必要。** 省くと、初回実行時に `msstore` ソースの利用規約同意プロンプトで待機し、標準入力が届かない環境（`CREATE_NO_WINDOW` で起動した非対話プロセス）では無期限にハングする。
+
 **`specify init` には4つのフラグがすべて必要**。1つでも欠けると壊れる。
 
 ```
@@ -187,6 +191,7 @@ specify init . --integration claude --script ps --force --non-interactive
 | `specs/005-dark-blue-caption/` | タイトルバーをネイビー `#1F3864`、文字を白にする |
 | `specs/006-readable-at-startup/` | 起動直後のまま結果の内容と完了案内が全文読めるようにする |
 | `specs/007-fix-caption-color-reset/` | フォルダ選択ダイアログの開閉でタイトルバーが白に戻る不具合を修正 |
+| `specs/008-fix-external-command-hang/` | uv導入(winget)の対話プロンプト無限ハングを修正し、`ProcessRunner`のタイムアウトをジョブオブジェクト＋監視スレッドで実効化 |
 
 **後の機能が前の機能の要件を一部置き換えている。** 各 spec の冒頭に対応表がある。設計文書は前機能の全文コピーではなく**差分のみ**を記述しているため、新しい番号から読むときは前の番号も併せて参照すること。
 

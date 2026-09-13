@@ -86,8 +86,12 @@ namespace
 			return;
 		}
 
+		// FR-801: winget は初回実行時、msstore ソースの利用規約同意プロンプトを表示することがあり、
+		// 本アプリは非対話実行のため入力待ちで無期限にハングする (research.md R-801)。
+		// --source winget でそのソースへのアクセス自体を避け、残る2フラグで将来の同意プロンプトにも備える。
 		ProcessResult install = ProcessRunner::Run(
-			_T("winget install --id=astral-sh.uv -e"), CString(), 10 * 60 * 1000);
+			_T("winget install --id=astral-sh.uv -e --accept-source-agreements --accept-package-agreements --source winget"),
+			CString(), 10 * 60 * 1000);
 		if (!install.launched)
 		{
 			Finish(step, StepResult::Failed, CommandNotFoundReason(_T("winget")), sink);
