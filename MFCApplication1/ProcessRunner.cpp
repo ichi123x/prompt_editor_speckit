@@ -72,6 +72,32 @@ namespace
 		}
 		return 0;
 	}
+
+	// FR-901・FR-902・FR-904: レジストリの指定サブキーから Path 値を読み取る。RRF_NOEXPAND を
+	// 指定しないため、REG_EXPAND_SZ の値（%SystemRoot% 等）は自動的に展開された状態で返る
+	// (research.md R-901)。取得できない場合（キー/値が存在しない、サイズ0等）は空の CString を
+	// 返し、呼び出し元はそのハイブから追記するものがないものとして扱う (research.md R-904)。
+	CString ReadRegistryPath(HKEY hive, LPCWSTR subKey)
+	{
+		DWORD size = 0;
+		LONG queryResult = ::RegGetValueW(hive, subKey, L"Path",
+										   RRF_RT_REG_SZ | RRF_RT_REG_EXPAND_SZ, nullptr, nullptr, &size);
+		if (queryResult != ERROR_SUCCESS || size == 0)
+		{
+			return CString();
+		}
+
+		CString value;
+		LPWSTR buffer = value.GetBuffer(size / sizeof(WCHAR));
+		queryResult = ::RegGetValueW(hive, subKey, L"Path",
+									  RRF_RT_REG_SZ | RRF_RT_REG_EXPAND_SZ, nullptr, buffer, &size);
+		value.ReleaseBuffer();
+		if (queryResult != ERROR_SUCCESS)
+		{
+			return CString();
+		}
+		return value;
+	}
 }
 
 namespace ProcessRunner
@@ -79,6 +105,53 @@ namespace ProcessRunner
 	ProcessResult Run(const CString& commandLine, const CString& workingDir, DWORD timeoutMs)
 	{
 		ProcessResult result;
+
+		// FR-901・FR-903・FR-905・FR-906: 子プロセスを起動する前に、レジストリのシステム/
+		// ユーザーPATHを読み直し、現在のプロセスのPATHの末尾へ追記する。008でwingetの対話
+		// プロンプトを解消した結果、新規インストール直後の同一プロセス内ではPATHの更新が
+		// 反映されず、後続の手順が「見つかりません」と誤判定する問題が実機で確認された
+		// (research.md R-902〜904)。置き換えではなく追記のため、レジストリ読み取りが片方・
+		// 両方失敗しても既存のPATHは失われない（両方失敗時は何もしない）。呼び出し箇所を
+		// ここ1箇所に集約し、SetupRunner.cpp は一切変更しない — これにより5手順の実行順序・
+		// 依存関係・べき等性を変えないことを構造的に保証する。
+		{
+			CString currentPath;
+			DWORD currentLen = ::GetEnvironmentVariable(_T("PATH"), nullptr, 0);
+			if (currentLen > 0)
+			{
+				LPWSTR buffer = currentPath.GetBuffer(currentLen);
+				::GetEnvironmentVariable(_T("PATH"), buffer, currentLen);
+				currentPath.ReleaseBuffer();
+			}
+
+			CString systemPath = ReadRegistryPath(HKEY_LOCAL_MACHINE,
+				_T("SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment"));
+			CString userPath = ReadRegistryPath(HKEY_CURRENT_USER, _T("Environment"));
+
+			// 少なくとも一方が読めた場合にのみ反映する。両方失敗した場合は何もせず、
+			// プロセスが起動時から持っていたPATHをそのまま使う (FR-903)。
+			if (!systemPath.IsEmpty() || !userPath.IsEmpty())
+			{
+				CString combined = currentPath;
+				if (!systemPath.IsEmpty())
+				{
+					if (!combined.IsEmpty())
+					{
+						combined += _T(";");
+					}
+					combined += systemPath;
+				}
+				if (!userPath.IsEmpty())
+				{
+					if (!combined.IsEmpty())
+					{
+						combined += _T(";");
+					}
+					combined += userPath;
+				}
+				::SetEnvironmentVariable(_T("PATH"), combined);
+			}
+		}
 
 		SECURITY_ATTRIBUTES sa = {};
 		sa.nLength = sizeof(sa);

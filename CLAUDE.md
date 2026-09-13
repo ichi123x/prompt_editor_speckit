@@ -113,6 +113,8 @@ msbuild MFCApplication1/MFCApplication1.vcxproj -p:Configuration=Debug -p:Platfo
 
 **winget を非対話実行する場合は `--accept-source-agreements --accept-package-agreements --source winget` が必要。** 省くと、初回実行時に `msstore` ソースの利用規約同意プロンプトで待機し、標準入力が届かない環境（`CREATE_NO_WINDOW` で起動した非対話プロセス）では無期限にハングする。
 
+**手順内で新規インストールしたツールは、そのままでは同一プロセス内の後続手順から見つからない（009で発見）。** `winget install` や `uv tool install` はレジストリのPATH（`HKCU\Environment` と `HKLM\SYSTEM\...\Session Manager\Environment`）を更新するが、既に起動済みの本アプリのプロセスが保持するPATHのコピーには反映されない。そのため、手順1でuvを新規導入した直後の手順2が、ディスク上には存在するのに「見つかりません」で失敗する。対策として `ProcessRunner::Run()` の先頭（`CreateProcess` を呼ぶ前）で、レジストリの2箇所のPATHを読み直し、**現在のプロセスが持つPATHの末尾に追記**する（置き換えではない）。追記にすることで、レジストリ読み取りが片方・両方失敗しても既存のPATHを失わない。呼び出し箇所を `Run()` の1箇所に集約しているため、この対応自体は `SetupRunner.cpp` を変更していない。
+
 **`specify init` には4つのフラグがすべて必要**。1つでも欠けると壊れる。
 
 ```
@@ -192,6 +194,7 @@ specify init . --integration claude --script ps --force --non-interactive
 | `specs/006-readable-at-startup/` | 起動直後のまま結果の内容と完了案内が全文読めるようにする |
 | `specs/007-fix-caption-color-reset/` | フォルダ選択ダイアログの開閉でタイトルバーが白に戻る不具合を修正 |
 | `specs/008-fix-external-command-hang/` | uv導入(winget)の対話プロンプト無限ハングを修正し、`ProcessRunner`のタイムアウトをジョブオブジェクト＋監視スレッドで実効化 |
+| `specs/009-refresh-path-after-install/` | 新規インストール直後にレジストリのPATHが同一プロセスへ反映されず後続手順が失敗する問題を修正 |
 
 **後の機能が前の機能の要件を一部置き換えている。** 各 spec の冒頭に対応表がある。設計文書は前機能の全文コピーではなく**差分のみ**を記述しているため、新しい番号から読むときは前の番号も併せて参照すること。
 
