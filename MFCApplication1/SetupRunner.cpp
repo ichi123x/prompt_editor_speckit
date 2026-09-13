@@ -129,6 +129,19 @@ namespace
 			Finish(step, StepResult::Failed, Brief(install.output), sink);
 			return;
 		}
+
+		// FR-1001・FR-1004・FR-1005: uv tool install はインストール先ディレクトリ
+		// (既定 %USERPROFILE%\.local\bin) をレジストリのPATHへ自動登録しないため、
+		// 明示的に uv tool update-shell を呼んで登録させる (research.md R-1001)。
+		// specify CLI 導入手順に固有の対応であり、他の手順 (winget・code・git) には
+		// 汎用化しない。009 で実装した ProcessRunner::Run() のPATH再読み込みと組み合わさり、
+		// 続く手順4がアプリを再起動しなくても specify を検出できるようになる。
+		//
+		// FR-1002・FR-1003: この呼び出しは install が成功した場合のみ行い (スキップ・失敗の
+		// 分岐には追加しない)、戻り値は判定に使わない。失敗しても手順2自体の成否には影響させず、
+		// 既存の「見つかりません」という失敗表示に自然にフォールバックさせる。
+		ProcessRunner::Run(_T("uv tool update-shell"), CString(), 60 * 1000);
+
 		Finish(step, StepResult::Success, _T("specify CLI をインストールしました。"), sink);
 	}
 

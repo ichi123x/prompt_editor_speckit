@@ -115,6 +115,8 @@ msbuild MFCApplication1/MFCApplication1.vcxproj -p:Configuration=Debug -p:Platfo
 
 **手順内で新規インストールしたツールは、そのままでは同一プロセス内の後続手順から見つからない（009で発見）。** `winget install` や `uv tool install` はレジストリのPATH（`HKCU\Environment` と `HKLM\SYSTEM\...\Session Manager\Environment`）を更新するが、既に起動済みの本アプリのプロセスが保持するPATHのコピーには反映されない。そのため、手順1でuvを新規導入した直後の手順2が、ディスク上には存在するのに「見つかりません」で失敗する。対策として `ProcessRunner::Run()` の先頭（`CreateProcess` を呼ぶ前）で、レジストリの2箇所のPATHを読み直し、**現在のプロセスが持つPATHの末尾に追記**する（置き換えではない）。追記にすることで、レジストリ読み取りが片方・両方失敗しても既存のPATHを失わない。呼び出し箇所を `Run()` の1箇所に集約しているため、この対応自体は `SetupRunner.cpp` を変更していない。
 
+**`uv tool install` はインストール先ディレクトリをレジストリのPATHへ自動登録しない（010で発見）。** 009の対策（レジストリPATHの再読み込み）は「レジストリに書かれているが反映されていない」ケースにしか効かず、「そもそもレジストリに書かれていない」ケースには無力。`uv tool install specify-cli` はspecify.exeを既定の `%USERPROFILE%\.local\bin` へ配置するだけで、そのディレクトリをPATHへ登録する処理を自動では行わない（`uv --help` にも該当フラグはない）。そのため、specify CLI導入直後の「Spec Kit 足場の配置」手順が「specifyが見つかりません」で失敗した。対策として `SetupRunner.cpp` の `RunInstallSpecify`（`uv tool install specify-cli` の成功直後）で `uv tool update-shell` を明示的に呼び、レジストリへの登録まで完結させる。この呼び出しの成否は判定に使わず、失敗しても手順2の結果には影響させない。009と異なりuvの `tool install` に固有の挙動であるため、`ProcessRunner::Run()` 側には汎用化せず `SetupRunner.cpp` 側で対応した。
+
 **`specify init` には4つのフラグがすべて必要**。1つでも欠けると壊れる。
 
 ```
@@ -195,6 +197,7 @@ specify init . --integration claude --script ps --force --non-interactive
 | `specs/007-fix-caption-color-reset/` | フォルダ選択ダイアログの開閉でタイトルバーが白に戻る不具合を修正 |
 | `specs/008-fix-external-command-hang/` | uv導入(winget)の対話プロンプト無限ハングを修正し、`ProcessRunner`のタイムアウトをジョブオブジェクト＋監視スレッドで実効化 |
 | `specs/009-refresh-path-after-install/` | 新規インストール直後にレジストリのPATHが同一プロセスへ反映されず後続手順が失敗する問題を修正 |
+| `specs/010-specify-path-registration/` | `uv tool install`がPATHへ自動登録しないため、`uv tool update-shell`を追加してspecify CLI導入直後の失敗を修正 |
 
 **後の機能が前の機能の要件を一部置き換えている。** 各 spec の冒頭に対応表がある。設計文書は前機能の全文コピーではなく**差分のみ**を記述しているため、新しい番号から読むときは前の番号も併せて参照すること。
 
