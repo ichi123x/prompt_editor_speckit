@@ -109,6 +109,16 @@ msbuild MFCApplication1/MFCApplication1.vcxproj -p:Configuration=Debug -p:Platfo
 
 **`ProcessRunner` はパイプを読み出しながら子プロセスの終了を待つ。** 読み出さずに `WaitForSingleObject` すると、子プロセスがパイプバッファ（既定 4KB）を埋めた時点でデッドロックする。
 
+**`ProcessRunner` のタイムアウトは、読み出しループの中の時刻比較だけでは機能しない。** `ReadFile` は子プロセスが何か書き込むまで無条件にブロックするため、子プロセスが出力を止めて入力待ちなどで無応答になると、時刻比較のコード自体が一度も実行されない（008で発見）。実例: `winget install` が初回実行時に `msstore` ソースの利用規約同意プロンプトを表示し、本アプリの非対話実行では入力が届かず無期限にハングした。対策として、子プロセスを `CREATE_SUSPENDED` で起動してジョブオブジェクト（`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`）へ割り当てた上で `ResumeThread` し、別スレッドが `WaitForSingleObject(hProcess, timeoutMs)` でタイムアウトを監視して超過時に `TerminateJobObject` でプロセスツリーごと終了させる方式にした。`TerminateProcess` を直接プロセスへ呼ぶだけでは、子プロセスがさらに起動した孫プロセス（例: `cmd.exe` が起動した `ping.exe` 相当）が残存し得る。
+
+**winget を非対話実行する場合は `--accept-source-agreements --accept-package-agreements --source winget` が必要。** 省くと、初回実行時に `msstore` ソースの利用規約同意プロンプトで待機し、標準入力が届かない環境（`CREATE_NO_WINDOW` で起動した非対話プロセス）では無期限にハングする。
+
+**手順内で新規インストールしたツールは、そのままでは同一プロセス内の後続手順から見つからない（009で発見）。** `winget install` や `uv tool install` はレジストリのPATH（`HKCU\Environment` と `HKLM\SYSTEM\...\Session Manager\Environment`）を更新するが、既に起動済みの本アプリのプロセスが保持するPATHのコピーには反映されない。そのため、手順1でuvを新規導入した直後の手順2が、ディスク上には存在するのに「見つかりません」で失敗する。対策として `ProcessRunner::Run()` の先頭（`CreateProcess` を呼ぶ前）で、レジストリの2箇所のPATHを読み直し、**現在のプロセスが持つPATHの末尾に追記**する（置き換えではない）。追記にすることで、レジストリ読み取りが片方・両方失敗しても既存のPATHを失わない。呼び出し箇所を `Run()` の1箇所に集約しているため、この対応自体は `SetupRunner.cpp` を変更していない。
+
+**`uv tool install` はインストール先ディレクトリをレジストリのPATHへ自動登録しない（010で発見）。** 009の対策（レジストリPATHの再読み込み）は「レジストリに書かれているが反映されていない」ケースにしか効かず、「そもそもレジストリに書かれていない」ケースには無力。`uv tool install specify-cli` はspecify.exeを既定の `%USERPROFILE%\.local\bin` へ配置するだけで、そのディレクトリをPATHへ登録する処理を自動では行わない（`uv --help` にも該当フラグはない）。そのため、specify CLI導入直後の「Spec Kit 足場の配置」手順が「specifyが見つかりません」で失敗した。対策として `SetupRunner.cpp` の `RunInstallSpecify`（`uv tool install specify-cli` の成功直後）で `uv tool update-shell` を明示的に呼び、レジストリへの登録まで完結させる。この呼び出しの成否は判定に使わず、失敗しても手順2の結果には影響させない。009と異なりuvの `tool install` に固有の挙動であるため、`ProcessRunner::Run()` 側には汎用化せず `SetupRunner.cpp` 側で対応した。
+
+**失敗理由の表示（`Brief()`）は先頭ではなく「最後の段落」を切り詰める（011で発見）。** `specify init`等、一部の外部コマンドは罫線・ブロック文字（Box Drawing/Block Elements、U+2500〜U+259F）による装飾バナーを出力の先頭に付ける。単純に先頭160文字を切り詰めると、装飾バナーだけで予算を使い切り、実際のエラー本文（実機で確認した例: `specify init`の`claude not found`）が一切表示されない。対策として、出力を行に分割し各行から装飾文字を除去したうえで、内容が残る行を段落にまとめ、**最後の段落をその先頭から**切り詰める方式にした。単純に「装飾除去後のテキスト全体の末尾を採用する」という設計も検討したが、実機データで検証したところ、エラー見出しの後に続く説明文だけで予算を使い切ってしまい見出し自体が失われることが判明したため採用しなかった（`/speckit-analyze`で発見）。段落の区切りは、罫線ボックス内部の余白（空行1行）を誤って区切りと判定しないよう、**空行2行以上の連続でのみ**区切ると判定する。
+
 **`specify init` には4つのフラグがすべて必要**。1つでも欠けると壊れる。
 
 ```
@@ -116,6 +126,16 @@ specify init . --integration claude --script ps --force --non-interactive
 ```
 
 `--non-interactive` を省くとパイプ接続時にプロンプト待ちでハングする。`--integration claude` を省くと非対話セッションでは Copilot が既定になる。`--force` を省くと非空ディレクトリで確認待ちになる。なお `specify init` 自体はネットワークを必要としない（テンプレートが CLI パッケージに同梱されている）。
+
+**`claude` による `/init` の非対話実行には `--permission-mode bypassPermissions` が必須（013で導入）。** CLAUDE.md生成の実体はファイル書き込みを伴うツール呼び出しであり、既定の権限確認モードのままでは非対話実行時にプロンプト待ちで止まる（winget の ToS 同意プロンプトと同種の問題）。
+
+```
+claude --print "/init のCLAUDE.mdは日本語で書いてください。" --permission-mode bypassPermissions --output-format text
+```
+
+`--print`（`-p`）を省くと対話セッションとして起動してしまいパイプ経由の実行と噛み合わない。この手順は「Git 初期化と初回コミット」に依存させており（`dependsOn = StepId::InitGit`）、Git初期化が失敗していれば自動的にスキップされる。タイムアウトは他手順より長い15分（`/init`はLLM呼び出しを伴い実行時間が変動する。実測34〜58秒だが対象リポジトリが大きいほど伸びる）。CLAUDE.mdのコミットは`git add -A`ではなく`git add -- CLAUDE.md`と対象を明示し、他の未コミット変更を巻き込まない。
+
+**`/init`のプロンプトに日本語指示を加えないと、生成されるCLAUDE.mdの本文が英語になる（014で発見）。** 本アプリは憲章 原則II により UI・コメント・ドキュメントを日本語で統一しているが、`claude --print /init ...`だけでは応答言語は`claude`自身の判断に委ねられ、実機では英語になった。対策として、プロンプト文字列に「/init のCLAUDE.mdは日本語で書いてください。」という指示を続けて渡す（上記コマンド）。ただし`claude`自身が常に付与する定型ヘッダー2行（`# CLAUDE.md`、`This file provides guidance to Claude Code...`）は英語のままであり、これは正常（プロンプトの指示によらず固定）。生成物が実際に日本語かどうかを機械的に自動判定する手段は無いため、確認は目視（DT）に委ねている。
 
 **処理中は2コントロールを無効化する** — 生成ボタンと参照ボタン（ラジオボタンは 002 で、診断ボタンは 003 で廃止）。参照ボタンを外すと、処理中にフォルダを変更されてワーカースレッドの処理対象と画面表示が食い違う。
 
@@ -187,6 +207,13 @@ specify init . --integration claude --script ps --force --non-interactive
 | `specs/005-dark-blue-caption/` | タイトルバーをネイビー `#1F3864`、文字を白にする |
 | `specs/006-readable-at-startup/` | 起動直後のまま結果の内容と完了案内が全文読めるようにする |
 | `specs/007-fix-caption-color-reset/` | フォルダ選択ダイアログの開閉でタイトルバーが白に戻る不具合を修正 |
+| `specs/008-fix-external-command-hang/` | uv導入(winget)の対話プロンプト無限ハングを修正し、`ProcessRunner`のタイムアウトをジョブオブジェクト＋監視スレッドで実効化 |
+| `specs/009-refresh-path-after-install/` | 新規インストール直後にレジストリのPATHが同一プロセスへ反映されず後続手順が失敗する問題を修正 |
+| `specs/010-specify-path-registration/` | `uv tool install`がPATHへ自動登録しないため、`uv tool update-shell`を追加してspecify CLI導入直後の失敗を修正 |
+| `specs/011-fix-error-message-truncation/` | 失敗理由の表示が装飾バナーに埋もれて実際のエラー内容が見えなくなる問題を、`Brief()`の段落単位抽出で修正 |
+| `specs/012-guide-claude-md-commit/` | 完了案内に`/init`実行直後のCLAUDE.mdコミット手順を追加。案内欄（`IDC_STATIC_GUIDE`）の高さも006 FR-507aに従い52→61 DLUへ拡張 |
+| `specs/013-automate-claude-init/` | 012で案内するだけだった`/init`実行とCLAUDE.mdコミットを、Git初期化に依存する6番目の導入手順として自動化。`.rc`の寸法変更は不要（006 FR-507aの見積もり上の余裕内） |
+| `specs/014-japanese-claude-md/` | 013が自動生成するCLAUDE.mdの本文が英語になっていた問題を、`/init`のプロンプトに日本語指示を1つ加えることで解消 |
 
 **後の機能が前の機能の要件を一部置き換えている。** 各 spec の冒頭に対応表がある。設計文書は前機能の全文コピーではなく**差分のみ**を記述しているため、新しい番号から読むときは前の番号も併せて参照すること。
 

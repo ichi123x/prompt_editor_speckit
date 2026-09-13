@@ -16,7 +16,8 @@ enum class StepId
 	InstallSpecify,     // specify CLI の導入 (InstallUv に依存)
 	InstallVsCodeExt,   // VS Code 拡張の導入 (依存なし)
 	InitSpecKit,        // Spec Kit 足場の配置 (InstallSpecify に依存)
-	InitGit             // Git 初期化・.gitignore・初回コミット (依存なし)
+	InitGit,            // Git 初期化・.gitignore・初回コミット (依存なし)
+	GenerateClaudeMd    // CLAUDE.md の生成とコミット (InitGit に依存) (013 FR-1301)
 };
 
 // 手順の実行結果 (data-model.md「StepResult」)。

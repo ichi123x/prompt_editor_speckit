@@ -601,12 +601,18 @@ void CMFCApplication1Dlg::ShowCompletionGuide()
 	}
 	else
 	{
+		// FR-1201・FR-1202: 導入手順書(SpecKitVSCodesetup.pdf 手順08)では /init 実行の直後に
+		// 生成物をコミットする。手順2と手順3(旧)の間にこのコミット手順を挿入し、以降の番号を
+		// 1つずつ繰り下げる。既存の手順の文言・m_workerPath の埋め込み方法は変更しない。
+		// FR-1311・FR-1312: 013でCLAUDE.mdの生成とコミットが手順6として自動化されたため、
+		// 012で追加した「/init実行」「CLAUDE.mdコミット」の案内2行を削除し、残りの手順
+		// （VS Codeを開く／テスト方針決定と憲章制定／/init再実行）を1から振り直す。
+		// 見出し・手順1の文言・m_workerPath の埋め込み方法・失敗時の案内文は変更しない。
 		guide.Format(
 			_T("Spec Kit の導入が完了しました。次の手順は Claude Code との対話が必要です。\r\n")
 			_T(" 1. VS Code で %s を開く（.specify と .claude が直下に見えるフォルダ）\r\n")
-			_T(" 2. Claude パネルで /init を実行し、CLAUDE.md を生成する\r\n")
-			_T(" 3. テスト方針を決め、/speckit-constitution で憲章を制定する\r\n")
-			_T(" 4. /init を再実行し、憲章を反映した CLAUDE.md に更新する"),
+			_T(" 2. テスト方針を決め、/speckit-constitution で憲章を制定する\r\n")
+			_T(" 3. /init を再実行し、憲章を反映した CLAUDE.md に更新する"),
 			static_cast<LPCTSTR>(m_workerPath));
 	}
 	SetGuideText(guide);

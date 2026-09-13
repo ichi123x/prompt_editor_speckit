@@ -21,19 +21,129 @@ namespace
 		return reason;
 	}
 
-	// 出力の先頭部分を理由欄へ載せるために切り詰める。
+	// FR-1102: 罫線描画文字 (Box Drawing, U+2500-257F) とブロック要素 (Block Elements,
+	// U+2580-259F) かどうかを判定する (research.md R-1103)。
+	bool IsDecorativeChar(WCHAR ch)
+	{
+		return (ch >= 0x2500 && ch <= 0x257F) || (ch >= 0x2580 && ch <= 0x259F);
+	}
+
+	// 1行から装飾文字を取り除いてTrimする。可視文字が残らなければ空文字列になる。
+	CString StripDecorativeChars(const CString& line)
+	{
+		CString result;
+		for (int i = 0; i < line.GetLength(); ++i)
+		{
+			WCHAR ch = line[i];
+			if (!IsDecorativeChar(ch))
+			{
+				result += ch;
+			}
+		}
+		result.Trim();
+		return result;
+	}
+
+	// CString::Tokenize は strtok 相当で連続する区切り文字をまとめて読み飛ばしてしまい、
+	// 空行を検出できない。段落の区切り判定に空行の連続数を使うため、空文字列の行も
+	// そのまま保持する素朴な分割を自前で行う。
+	std::vector<CString> SplitLines(const CString& text)
+	{
+		std::vector<CString> lines;
+		int start = 0;
+		int length = text.GetLength();
+		for (int i = 0; i <= length; ++i)
+		{
+			if (i == length || text[i] == _T('\n'))
+			{
+				lines.push_back(text.Mid(start, i - start));
+				start = i + 1;
+			}
+		}
+		return lines;
+	}
+
+	CString JoinWithSpace(const std::vector<CString>& parts)
+	{
+		CString joined;
+		for (size_t i = 0; i < parts.size(); ++i)
+		{
+			if (i > 0)
+			{
+				joined += _T(" ");
+			}
+			joined += parts[i];
+		}
+		return joined;
+	}
+
+	// 出力の先頭部分ではなく、実際に診断の役に立つ内容を理由欄へ載せるために整形する。
+	//
+	// FR-1101・FR-1102: specify等の一部の外部コマンドは、罫線・ブロック文字による装飾バナーを
+	// 出力の先頭に付けるため、単純な先頭切り詰めでは実際のエラー本文が失われる
+	// (research.md R-1101、実機の specify init で確認)。出力を行に分割し、各行から装飾文字を
+	// 取り除いたうえで、可視文字が残る行（内容行）だけを段落にまとめ、最後の段落を採用する。
+	// 罫線ボックス内部の余白として現れる空行1行だけでは段落の区切りとみなさず、2行以上
+	// 連続した空行でのみ区切る（research.md R-1102 — 区切りを空行1行にすると、タイトル行と
+	// 本文行が別の段落に分断され、最後の段落に肝心の見出しが含まれなくなることを実機データで確認済み）。
+	// FR-1104: 採用した段落は maxLength を超える場合その段落の先頭から切り詰める。
+	// FR-1105: 本関数の変更は SetupRunner.cpp 内に閉じ、ProcessRunner 側には一切影響しない。
 	CString Brief(const CString& output, int maxLength = 160)
 	{
-		CString text = output;
-		text.Replace(_T("\r\n"), _T(" "));
-		text.Replace(_T("\n"), _T(" "));
-		text.Replace(_T("\t"), _T(" "));
-		text.Trim();
-		if (text.GetLength() > maxLength)
+		// FR-1103: 装飾除去が効かない場合のフォールバック用に、既存どおりの正規化結果も用意する。
+		CString normalizedWhole = output;
+		normalizedWhole.Replace(_T("\r\n"), _T(" "));
+		normalizedWhole.Replace(_T("\n"), _T(" "));
+		normalizedWhole.Replace(_T("\t"), _T(" "));
+		normalizedWhole.Trim();
+
+		CString forSplit = output;
+		forSplit.Replace(_T("\r\n"), _T("\n"));
+		forSplit.Replace(_T("\t"), _T(" "));
+
+		std::vector<CString> paragraphs;
+		std::vector<CString> current;
+		int emptyRun = 0;
+		for (const CString& line : SplitLines(forSplit))
 		{
-			text = text.Left(maxLength) + _T("...");
+			CString stripped = StripDecorativeChars(line);
+			if (stripped.IsEmpty())
+			{
+				++emptyRun;
+				if (emptyRun >= 2 && !current.empty())
+				{
+					paragraphs.push_back(JoinWithSpace(current));
+					current.clear();
+				}
+			}
+			else
+			{
+				emptyRun = 0;
+				current.push_back(stripped);
+			}
 		}
-		return text;
+		if (!current.empty())
+		{
+			paragraphs.push_back(JoinWithSpace(current));
+		}
+
+		if (paragraphs.empty())
+		{
+			// FR-1103: 内容行が1つも無かった場合 (出力全体が装飾のみ) は、既存どおり
+			// 先頭から切り詰めたものにフォールバックする。
+			if (normalizedWhole.GetLength() > maxLength)
+			{
+				return normalizedWhole.Left(maxLength) + _T("...");
+			}
+			return normalizedWhole;
+		}
+
+		CString lastParagraph = paragraphs.back();
+		if (lastParagraph.GetLength() > maxLength)
+		{
+			return lastParagraph.Left(maxLength) + _T("...");
+		}
+		return lastParagraph;
 	}
 
 	void Finish(SetupStep& step, StepResult result, LPCTSTR reason, ISetupProgressSink* sink)
@@ -86,8 +196,12 @@ namespace
 			return;
 		}
 
+		// FR-801: winget は初回実行時、msstore ソースの利用規約同意プロンプトを表示することがあり、
+		// 本アプリは非対話実行のため入力待ちで無期限にハングする (research.md R-801)。
+		// --source winget でそのソースへのアクセス自体を避け、残る2フラグで将来の同意プロンプトにも備える。
 		ProcessResult install = ProcessRunner::Run(
-			_T("winget install --id=astral-sh.uv -e"), CString(), 10 * 60 * 1000);
+			_T("winget install --id=astral-sh.uv -e --accept-source-agreements --accept-package-agreements --source winget"),
+			CString(), 10 * 60 * 1000);
 		if (!install.launched)
 		{
 			Finish(step, StepResult::Failed, CommandNotFoundReason(_T("winget")), sink);
@@ -125,6 +239,19 @@ namespace
 			Finish(step, StepResult::Failed, Brief(install.output), sink);
 			return;
 		}
+
+		// FR-1001・FR-1004・FR-1005: uv tool install はインストール先ディレクトリ
+		// (既定 %USERPROFILE%\.local\bin) をレジストリのPATHへ自動登録しないため、
+		// 明示的に uv tool update-shell を呼んで登録させる (research.md R-1001)。
+		// specify CLI 導入手順に固有の対応であり、他の手順 (winget・code・git) には
+		// 汎用化しない。009 で実装した ProcessRunner::Run() のPATH再読み込みと組み合わさり、
+		// 続く手順4がアプリを再起動しなくても specify を検出できるようになる。
+		//
+		// FR-1002・FR-1003: この呼び出しは install が成功した場合のみ行い (スキップ・失敗の
+		// 分岐には追加しない)、戻り値は判定に使わない。失敗しても手順2自体の成否には影響させず、
+		// 既存の「見つかりません」という失敗表示に自然にフォールバックさせる。
+		ProcessRunner::Run(_T("uv tool update-shell"), CString(), 60 * 1000);
+
 		Finish(step, StepResult::Success, _T("specify CLI をインストールしました。"), sink);
 	}
 
@@ -336,6 +463,94 @@ namespace
 		}
 		Finish(step, StepResult::Success, note, sink);
 	}
+
+	// 対象フォルダ直下に指定した名前のファイルが存在するか (013)。
+	// TargetFolderState は .specify/.claude 等の既存の事実しか持たないため、
+	// CLAUDE.md 用に拡張せず、GitignoreWriter.cpp/TargetFolderState.cpp と同じ
+	// GetFileAttributes の使い方でここに閉じたヘルパーとして持つ (原則III YAGNI)。
+	bool FileExists(const CString& folderPath, LPCTSTR fileName)
+	{
+		CString path = folderPath;
+		if (!path.IsEmpty() && path[path.GetLength() - 1] != _T('\\'))
+		{
+			path += _T('\\');
+		}
+		path += fileName;
+		DWORD attr = ::GetFileAttributes(path);
+		return attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY) == 0;
+	}
+
+	// --- 手順6: CLAUDE.md の生成とコミット (013、contracts/claude-init-contract.md) ---
+	//
+	// 本関数はいずれの失敗経路でも StepResult::Failed を返して呼び出し元 (RunAll) へ
+	// 復帰するのみであり、それ以前の手順 (Git初期化等、既存4手順) の結果を書き換えたり
+	// 取り消したりする処理は一切行わない。既存4手順のコードには一切触れないため、この
+	// 非ロールバック特性は追加コードを書かないことで自然に満たされる (FR-1308)。
+	void RunGenerateClaudeMd(SetupStep& step, const CString& folderPath, ISetupProgressSink* sink)
+	{
+		// FR-1303: 既に CLAUDE.md が存在する場合、内容の正しさは問わずスキップする。
+		// 他手順 (RunInitSpecKit の .specify/.claude 存在確認) と同じ「存在すれば
+		// 完了済みとみなす」設計に合わせる (research.md Assumptions)。
+		if (FileExists(folderPath, _T("CLAUDE.md")))
+		{
+			Finish(step, StepResult::Skipped, _T("CLAUDE.md は既に生成されています。"), sink);
+			return;
+		}
+
+		// FR-1304・FR-1309・FR-1310・R-1301: claude CLI を非対話・確認スキップモードで
+		// 実行し /init を実行させる。ProcessRunner 経由のため、PATH再読み込み(009)・
+		// タイムアウト監視(008)の仕組みをそのまま利用する。/init はLLM呼び出しを伴い
+		// 実行時間が変動するため (実測34〜58秒)、他手順より長い15分をタイムアウトとする
+		// (R-1305)。
+		// FR-1401・FR-1402・FR-1403 (014、R-1401): プロンプトに日本語での指示を1つ
+		// 加えるだけで、生成されるCLAUDE.mdの本文が日本語になることを実機で確認した。
+		// それ以外のフラグ・タイムアウト・以降の処理は013から変更しない。
+		ProcessResult init = ProcessRunner::Run(
+			_T("claude --print \"/init のCLAUDE.mdは日本語で書いてください。\" --permission-mode bypassPermissions --output-format text"),
+			folderPath, 15 * 60 * 1000);
+
+		// FR-1307: claude が PATH 上に見つからない場合は他手順と同じ様式で失敗にする。
+		if (!init.launched)
+		{
+			Finish(step, StepResult::Failed, CommandNotFoundReason(_T("claude")), sink);
+			return;
+		}
+		if (!init.Succeeded())
+		{
+			Finish(step, StepResult::Failed, Brief(init.output), sink);
+			return;
+		}
+
+		// FR-1305: コマンドが成功しても、実際に CLAUDE.md が生成されたことを確認する
+		// (RunInitSpecKit の .specify/.claude 存在確認と同じ二段判定)。
+		if (!FileExists(folderPath, _T("CLAUDE.md")))
+		{
+			Finish(step, StepResult::Failed,
+				   _T("/init は完了しましたが、CLAUDE.md を確認できませんでした。"), sink);
+			return;
+		}
+
+		// FR-1306・R-1304: CLAUDE.md のみを対象にステージする。RunInitGit が持つ
+		// 「git status を見て他人の変更を検出したら限定ステージングに切り替える」という
+		// 分岐は複製しない。対象ファイルが常に CLAUDE.md 1つに定まっているため、
+		// git add -A ではなく対象を明示するだけで他の未コミット変更を巻き込まずに済む。
+		ProcessResult add = ProcessRunner::Run(_T("git add -- CLAUDE.md"), folderPath, 60 * 1000);
+		if (!add.Succeeded())
+		{
+			Finish(step, StepResult::Failed, Brief(add.output), sink);
+			return;
+		}
+
+		ProcessResult commit = ProcessRunner::Run(
+			_T("git commit -m \"CLAUDE.md を追加\""), folderPath, 60 * 1000);
+		if (!commit.Succeeded())
+		{
+			Finish(step, StepResult::Failed, Brief(commit.output), sink);
+			return;
+		}
+
+		Finish(step, StepResult::Success, _T("CLAUDE.md を生成し、コミットしました。"), sink);
+	}
 }
 
 namespace SetupRunner
@@ -374,6 +589,15 @@ namespace SetupRunner
 		git.dependsOn = StepId::None;
 		steps.push_back(git);
 
+		// FR-1301・FR-1302: Git初期化の後に実行し、InitGitに依存する。InitGitが失敗した
+		// 場合は既存のDependencyFailed()/FR-012の仕組みにより自動的にスキップされる
+		// (R-1306)。
+		SetupStep claudeMd;
+		claudeMd.id = StepId::GenerateClaudeMd;
+		claudeMd.displayName = _T("CLAUDE.md の生成とコミット");
+		claudeMd.dependsOn = StepId::InitGit;
+		steps.push_back(claudeMd);
+
 		return steps;
 	}
 
@@ -407,6 +631,9 @@ namespace SetupRunner
 				break;
 			case StepId::InitGit:
 				RunInitGit(step, folderPath, sink);
+				break;
+			case StepId::GenerateClaudeMd:
+				RunGenerateClaudeMd(step, folderPath, sink);
 				break;
 			default:
 				break;
