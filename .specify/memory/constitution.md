@@ -1,13 +1,17 @@
 <!--
 Sync Impact Report
-- Version change: (template) → 1.0.0
-- Modified principles: N/A（プレースホルダーテンプレートからの初回制定）
+- Version change: 1.0.0 → 1.1.0
+- Modified principles:
+  - I. Spec Kit ワークフロー厳守（コマンド列挙に /speckit-converge と /speckit-taskstoissues を追加し、
+    列挙が「必須順序」であって「使用可能なコマンドの全集合」ではないことを明記）
 - Added sections:
-  - Core Principles: I. Spec Kit ワークフロー厳守 / II. 日本語での一貫性 / III. シンプルさ優先（YAGNI） / IV. 変更の追跡可能性
-  - 技術的制約
-  - 開発ワークフロー
-  - Governance
-- Removed sections: [PRINCIPLE_5_NAME]（テンプレートの5番目の原則スロットは本プロジェクトでは未使用のため削除）
+  - Core Principles: V. 検証は実測に基づく
+- Removed sections: なし
+- Other corrections:
+  - 技術的制約: ビルドコマンドの Platform を <x64|Win32> → <x64|x86> に訂正。
+    .sln に Win32 を渡すと error MSB4126 になることを実測で確認（2026-09-14）。
+    誤った記述を残すと、Governance の「憲法優先」規定により CLAUDE.md の正しい記載を
+    誤って修正させる力が働くため、事実誤りとして訂正した。
 - Deferred TODOs: なし
 -->
 
@@ -20,8 +24,10 @@ Sync Impact Report
 → `/speckit-tasks` → `/speckit-analyze` / `/speckit-checklist` → `/speckit-implement` の順序で進めなければ
 ならない（MUST）。いずれかの段階を飛ばして直接コード実装やビルドに進んではならない。各段階の成果物
 （spec.md、plan.md、tasks.md 等）は次段階が読み込む前提の情報源であり、勝手に省略・改変してはならない。
-`.specify/extensions.yml` にフックが定義されている場合は、各スキルの Pre/Post-Execution Checks に従って
-必ず確認しなければならない。
+この列挙は**必須の順序**を定めるものであり、使用可能なコマンドの全集合ではない。`/speckit-implement` の
+後に残作業を洗い出す `/speckit-converge`、タスクを課題として起票する `/speckit-taskstoissues` なども
+必要に応じて用いてよい。`.specify/extensions.yml` にフックが定義されている場合は、各スキルの
+Pre/Post-Execution Checks に従って必ず確認しなければならない。
 **理由**: 段階を飛ばすと仕様と実装が乖離し、後工程（tasks/implement）が前提とする情報が欠落する。
 
 ### II. 日本語での一貫性
@@ -45,11 +51,31 @@ Sync Impact Report
 関係がその代替として変更の妥当性を担保する一次情報源となる。
 **理由**: テストによる裏付けがない状態では、仕様との対応関係だけが変更意図を将来検証する手段になる。
 
+### V. 検証は実測に基づく
+要件の充足判定・寸法・外部コマンドの挙動・環境の前提は、目視や推測ではなく実測に基づいて判断しなければ
+ならない（MUST）。
+
+- 画面表示の判定は、目視ではなく機械的に取得した値（ピクセル・列幅・行数）で行う。
+- 「設定ファイルに記述が無い」ことから「その機能が無い」と結論づけてはならない。ビルド済みの成果物や
+  実行中のプロセスを確認すること。
+- 別の機能で得た測定値を、測定の基準（対象範囲・除外条件）を確かめずに転用してはならない。
+- 検査そのものが正しく動くことを確かめなければならない。実装前に実行して意図どおり不合格になること、
+  または既に正しい状態に対して合格することを確認する。
+- 測れないものは安全側に見積もり、見積もりであることを明記する。検査と実装が同じ見積もりを共有する
+  場合は、誤差を吸収する余裕を別枠で確保しなければならない。
+
+**理由**: 自動テストスイートが存在しないため、検査手順そのものが唯一の品質保証手段である。その検査が
+誤っていれば「合格した」という事実は何も保証しない。実際に 001〜014 の開発を通じて、目視判断の誤り・
+検査の自己破綻（検査が自身のコメントを拾って不合格になる）・測定基準の取り違え（別機能の値の無検証な
+転用）が繰り返し発生した。
+
 ## 技術的制約
 
 - `MFCApplication1` は Visual Studio 専用のMFCプロジェクトであり、CMake/Makefile等の代替ビルドシステム
   を導入してはならない（MUST NOT）。ビルドは `msbuild MFCApplication1/MFCApplication1.sln
-  -p:Configuration=<Debug|Release> -p:Platform=<x64|Win32>` を用いる。
+  -p:Configuration=<Debug|Release> -p:Platform=<x64|x86>` を用いる。`.sln` に渡すプラットフォーム名は
+  `x86` であり、`Win32` を渡すと `error MSB4126` で失敗する（2026-09-14 に実測で確認）。`Win32` は
+  `.vcxproj` を直接ビルドする場合の名前である。
 - Spec Kit 側のスクリプトは PowerShell（`.specify/scripts/powershell/`）のみをサポートする。bash版スクリ
   プトを新規追加してはならない。Windows環境では `.ps1` の実行にBashツールではなくPowerShellツールを使用
   すること。
@@ -68,7 +94,8 @@ Sync Impact Report
 ## Governance（ガバナンス）
 
 本憲法はこのリポジトリにおける他のすべての開発慣行・ガイダンスに優先する。CLAUDE.md や各 `SKILL.md` の
-記述が本憲法と矛盾する場合は、本憲法を優先し、矛盾箇所は発見次第修正しなければならない。
+記述が本憲法と矛盾する場合は、本憲法を優先し、矛盾箇所は発見次第修正しなければならない。ただし本憲法の
+記述自体が事実と異なることが実測で判明した場合は、原則Vに従い、本憲法の側を訂正する。
 
 - **改訂手続き**: 憲法の変更は `/speckit-constitution` を通じてのみ行う。変更内容は必ずファイル冒頭の
   Sync Impact Report に記録する。
@@ -80,4 +107,4 @@ Sync Impact Report
   おいて、本憲法の原則との矛盾がないかを確認しなければならない（MUST）。矛盾が見つかった場合は、実装を
   進める前に spec/plan を修正するか、本憲法の改訂を検討する。
 
-**Version**: 1.0.0 | **Ratified**: 2026-09-06 | **Last Amended**: 2026-09-06
+**Version**: 1.1.0 | **Ratified**: 2026-09-06 | **Last Amended**: 2026-09-14
