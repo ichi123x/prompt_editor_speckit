@@ -196,6 +196,9 @@ BOOL CMFCApplication1Dlg::OnInitDialog()
 	SetGuideText(_T("対象フォルダを選び、「生成」を押してください。")
 				 _T("\r\n対象のプロジェクトは、あらかじめ Visual Studio 2022 などのウィザードで作成し、そのフォルダに配置しておいてください。"));
 
+	// 016 FR-1601: リポジトリ登録の既定は「OK」。
+	CheckRadioButton(IDC_RADIO_REPO_OK, IDC_RADIO_REPO_NG, IDC_RADIO_REPO_OK);
+
 	// 004 FR-301: 追従テーブルの初期化。すべての記録が済んだ最後に m_layoutReady を立てる。
 	InitAnchors();
 
@@ -400,6 +403,10 @@ void CMFCApplication1Dlg::SetControlsEnabled(bool enabled)
 {
 	const BOOL flag = enabled ? TRUE : FALSE;
 
+	// 016 FR-1608（2026-09-17改訂）: リポジトリ登録のラジオボタンは無効化しない。
+	// 選択は「生成」押下時に m_workerRegisterRepo へコピー済みで（m_workerPath と同じ
+	// パターン）、実行中に選択を変えても実行中のワーカーには影響しない。実機確認の結果、
+	// 無効化は不要と判断した（研究記録: research.md R-1608参照）。
 	CWnd* controls[] = {
 		GetDlgItem(IDC_BUTTON_GENERATE),
 		GetDlgItem(IDC_BUTTON_BROWSE)
@@ -535,7 +542,9 @@ void CMFCApplication1Dlg::OnBnClickedButtonGenerate()
 	// 参照しないことで、UI の変更と処理対象の食い違いを防ぐ
 	// (contracts/ui-contract.md「実行中に無効化するコントロール」)。
 	m_workerPath = m_targetPath;
-	m_steps = SetupRunner::CreateSteps();
+	// 016 R-1602: m_workerPath と同じパターンで、選択もここでコピーする。
+	m_workerRegisterRepo = (IsDlgButtonChecked(IDC_RADIO_REPO_OK) == BST_CHECKED);
+	m_steps = SetupRunner::CreateSteps(m_workerRegisterRepo);
 
 	m_running = true;
 	SetControlsEnabled(false);
@@ -554,7 +563,7 @@ UINT AFX_CDECL CMFCApplication1Dlg::SetupThreadProc(LPVOID param)
 	CMFCApplication1Dlg* dialog = static_cast<CMFCApplication1Dlg*>(param);
 	if (dialog != nullptr)
 	{
-		SetupRunner::RunAll(dialog->m_workerPath, dialog->m_steps, dialog);
+		SetupRunner::RunAll(dialog->m_workerPath, dialog->m_steps, dialog, dialog->m_workerRegisterRepo);
 		dialog->PostMessage(WM_APP_SETUP_COMPLETED, 0, 0);
 	}
 	return 0;
@@ -656,6 +665,10 @@ void CMFCApplication1Dlg::InitAnchors()
 		{ IDC_EDIT_TARGET_PATH,    AnchorMode::StretchH,             CRect() },  // FR-302
 		{ IDC_BUTTON_BROWSE,       AnchorMode::AnchorRight,          CRect() },  // FR-304
 		{ IDC_BUTTON_GENERATE,     AnchorMode::Fixed,                CRect() },  // FR-305
+		// 016 FR-1609: 生成ボタンと同じ行に相対配置するため、生成ボタンと同じ Fixed とする。
+		{ IDC_STATIC_REPO_LABEL,   AnchorMode::Fixed,                CRect() },  // FR-1609
+		{ IDC_RADIO_REPO_OK,       AnchorMode::Fixed,                CRect() },  // FR-1609
+		{ IDC_RADIO_REPO_NG,       AnchorMode::Fixed,                CRect() },  // FR-1609
 		{ IDC_LIST_RESULT,         AnchorMode::StretchBoth,          CRect() },  // FR-302, FR-303
 		{ IDC_STATIC_GUIDE,        AnchorMode::AnchorBottomStretchH, CRect() },  // FR-302, FR-303
 		{ IDOK,                    AnchorMode::AnchorBottomRight,    CRect() },  // FR-303, FR-304

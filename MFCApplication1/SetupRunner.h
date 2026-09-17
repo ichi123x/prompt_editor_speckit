@@ -49,14 +49,19 @@ public:
 
 namespace SetupRunner
 {
-	// 5手順を実行順に並べた初期状態を返す。
-	std::vector<SetupStep> CreateSteps();
+	// 6手順を実行順に並べた初期状態を返す。
+	// registerRepo が false の場合、手順6の displayName は「CLAUDE.md の生成とコミット」
+	// ではなく「CLAUDE.md の生成」になる (016 FR-1605)。
+	std::vector<SetupStep> CreateSteps(bool registerRepo);
 
-	// 5手順を順に実行する。各手順の完了ごとに sink へ通知する。
+	// 6手順を順に実行する。各手順の完了ごとに sink へ通知する。
 	// folderPath はワーカースレッド起動時にコピーされた値であり、
 	// 実行中にダイアログのメンバ変数を参照しない (contracts/ui-contract.md「2.」)。
+	// registerRepo が false の場合、手順5（Git初期化）を実行せず、手順6は
+	// CLAUDE.mdの生成のみ行いコミットしない (016 FR-1603, FR-1604)。
 	void RunAll(const CString& folderPath,
-				std::vector<SetupStep>& steps, ISetupProgressSink* sink);
+				std::vector<SetupStep>& steps, ISetupProgressSink* sink,
+				bool registerRepo);
 
 	// 結果の表示文字列 (contracts/ui-contract.md「4. メッセージ文字列の契約」)。
 	CString ResultDisplayName(StepResult result);

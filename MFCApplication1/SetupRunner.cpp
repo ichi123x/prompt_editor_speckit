@@ -324,8 +324,20 @@ namespace
 	}
 
 	// --- 手順5: Git 初期化・.gitignore・初回コミット (research.md R-006) ----
-	void RunInitGit(SetupStep& step, const CString& folderPath, ISetupProgressSink* sink)
+	void RunInitGit(SetupStep& step, const CString& folderPath, ISetupProgressSink* sink,
+					 bool registerRepo)
 	{
+		// 016 FR-1603: 「NG」が選択された場合、本手順は一切実行しない。
+		// StepResult::Skipped で終えることで、既存の DependencyFailed() の仕組み
+		// （Skipped は依存充足として扱われる）により手順6はそのまま実行される
+		// (research.md R-1601)。
+		if (!registerRepo)
+		{
+			Finish(step, StepResult::Skipped,
+				   _T("「NG」が選択されたため、Gitの初期化を行いませんでした。"), sink);
+			return;
+		}
+
 		TargetFolderState state = TargetFolder::Read(folderPath);
 
 		// .gitignore の追記ブロックまで揃っていて、かつコミット済みなら手順全体をスキップする。
@@ -486,7 +498,8 @@ namespace
 	// 復帰するのみであり、それ以前の手順 (Git初期化等、既存4手順) の結果を書き換えたり
 	// 取り消したりする処理は一切行わない。既存4手順のコードには一切触れないため、この
 	// 非ロールバック特性は追加コードを書かないことで自然に満たされる (FR-1308)。
-	void RunGenerateClaudeMd(SetupStep& step, const CString& folderPath, ISetupProgressSink* sink)
+	void RunGenerateClaudeMd(SetupStep& step, const CString& folderPath, ISetupProgressSink* sink,
+							   bool registerRepo)
 	{
 		// FR-1303: 既に CLAUDE.md が存在する場合、内容の正しさは問わずスキップする。
 		// 他手順 (RunInitSpecKit の .specify/.claude 存在確認) と同じ「存在すれば
@@ -530,6 +543,14 @@ namespace
 			return;
 		}
 
+		// 016 FR-1604: 「NG」が選択された場合、CLAUDE.mdの生成まではここまでの処理で
+		// 完了しているが、コミット（git add / git commit）は行わない。
+		if (!registerRepo)
+		{
+			Finish(step, StepResult::Success, _T("CLAUDE.md を生成しました。"), sink);
+			return;
+		}
+
 		// FR-1306・R-1304: CLAUDE.md のみを対象にステージする。RunInitGit が持つ
 		// 「git status を見て他人の変更を検出したら限定ステージングに切り替える」という
 		// 分岐は複製しない。対象ファイルが常に CLAUDE.md 1つに定まっているため、
@@ -555,7 +576,7 @@ namespace
 
 namespace SetupRunner
 {
-	std::vector<SetupStep> CreateSteps()
+	std::vector<SetupStep> CreateSteps(bool registerRepo)
 	{
 		std::vector<SetupStep> steps;
 
@@ -592,9 +613,11 @@ namespace SetupRunner
 		// FR-1301・FR-1302: Git初期化の後に実行し、InitGitに依存する。InitGitが失敗した
 		// 場合は既存のDependencyFailed()/FR-012の仕組みにより自動的にスキップされる
 		// (R-1306)。
+		// 016 FR-1605: 「NG」選択時（registerRepo == false）はコミットを行わないため、
+		// 項目名も「CLAUDE.md の生成とコミット」ではなく「CLAUDE.md の生成」にする。
 		SetupStep claudeMd;
 		claudeMd.id = StepId::GenerateClaudeMd;
-		claudeMd.displayName = _T("CLAUDE.md の生成とコミット");
+		claudeMd.displayName = registerRepo ? _T("CLAUDE.md の生成とコミット") : _T("CLAUDE.md の生成");
 		claudeMd.dependsOn = StepId::InitGit;
 		steps.push_back(claudeMd);
 
@@ -602,7 +625,8 @@ namespace SetupRunner
 	}
 
 	void RunAll(const CString& folderPath,
-				std::vector<SetupStep>& steps, ISetupProgressSink* sink)
+				std::vector<SetupStep>& steps, ISetupProgressSink* sink,
+				bool registerRepo)
 	{
 		for (auto& step : steps)
 		{
@@ -630,10 +654,10 @@ namespace SetupRunner
 				RunInitSpecKit(step, folderPath, sink);
 				break;
 			case StepId::InitGit:
-				RunInitGit(step, folderPath, sink);
+				RunInitGit(step, folderPath, sink, registerRepo);
 				break;
 			case StepId::GenerateClaudeMd:
-				RunGenerateClaudeMd(step, folderPath, sink);
+				RunGenerateClaudeMd(step, folderPath, sink, registerRepo);
 				break;
 			default:
 				break;

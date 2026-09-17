@@ -26,6 +26,11 @@
 // 技術的にはIDが不要だが、追従テーブルに載せて ST-303（定義漏れの検出）を
 // 成立させるため。IDC_STATIC(-1) のままでは GetDlgItem で識別できない。
 #define IDC_STATIC_TARGET_LABEL			1008
+// 016 FR-1601: 「リポジトリの登録：」ラベルとOK/NGラジオボタン。
+// IDC_RADIO_REPO_OK はグループの先頭 (WS_GROUP) とする (research.md R-1607)。
+#define IDC_STATIC_REPO_LABEL			1009
+#define IDC_RADIO_REPO_OK				1010
+#define IDC_RADIO_REPO_NG				1011
 
 // 新しいオブジェクトの次の既定値
 //
@@ -33,7 +38,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 
 #define _APS_NEXT_RESOURCE_VALUE	130
-#define _APS_NEXT_CONTROL_VALUE		1009
+#define _APS_NEXT_CONTROL_VALUE		1012
 #define _APS_NEXT_SYMED_VALUE		101
 #define _APS_NEXT_COMMAND_VALUE		32771
 #endif

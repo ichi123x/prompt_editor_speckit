@@ -83,6 +83,7 @@ protected:
 	// ワーカースレッドが操作する。UI スレッドは実行中に触らない。
 	std::vector<SetupStep> m_steps;
 	CString m_workerPath;        // ワーカーへ渡す対象フォルダのコピー
+	bool m_workerRegisterRepo = true;   // 016 R-1602: ワーカーへ渡す選択のコピー。既定 true = 「OK」
 
 	// --- 004: リサイズ追従の状態 ---
 	std::vector<AnchorEntry> m_anchors;   // 追従テーブル。8コントロールすべてを登録する
