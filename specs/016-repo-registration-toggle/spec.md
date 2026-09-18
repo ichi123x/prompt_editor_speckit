@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-17
 
-**Status**: Draft
+**Status**: Implemented
 
 **Input**: User description: "生成ボタンの右側に、"リポジトリの登録："ラベルを作成し、OK, NGのラジオボタンを配置する。デフォルトは、"する"を選択する。OKの場合は、Git初期化と初回コミットの処理、CLAUDE.mdの生成とコミットの処理を実行する。NGの場合、Git初期化と初回コミットの処理、CLAUDE.mdの生成とコミットの処理を実行しない。ただし、NGの場合でも、CLAUDE.mdは生成される。そのため、処理とメッセージは、Git初期化と初回コミット、OKの場合は、CLAUDE.mdの生成とコミット、NGの場合は、CLAUDE.mdの生成になる。"
 

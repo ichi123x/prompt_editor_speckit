@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-13
 
-**Status**: Draft
+**Status**: Implemented
 
 **Input**: User description: "SDD化完了時にアプリが表示する案内文（次にClaude Codeで行うべき手順の一覧）に、/initを実行してCLAUDE.mdを生成した直後に、それをGitへコミットする手順が抜けている問題を修正する。参考にしたセットアップ手順書(SpecKitVSCodesetup.pdf 手順08)では、/init実行の直後に git add -A / git commit -m \"CLAUDE.md を追加\" を行うことになっており、これをコミットしないまま次の手順(テスト方針の決定・/speckit-constitution)に進むと、生成されたCLAUDE.mdが未コミットのまま放置されうる。案内文に、/init実行後のコミット手順を追加する。"
 

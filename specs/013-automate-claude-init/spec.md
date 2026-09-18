@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-13
 
-**Status**: Draft
+**Status**: Implemented
 
 **Input**: User description: "SDD化の完了案内で「/initを実行してCLAUDE.mdを生成する」「生成されたCLAUDE.mdをコミットする」という2手順を、利用者による手動実行から、アプリ自身が自動実行する6番目の導入手順に変更する。"
 

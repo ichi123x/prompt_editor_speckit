@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-08
 
-**Status**: Draft
+**Status**: Implemented
 
 **Input**: User description: "準備状況のボタンと機能は不要です。"
 

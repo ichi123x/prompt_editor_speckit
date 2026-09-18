@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-13
 
-**Status**: Draft
+**Status**: Implemented
 
 **Input**: User description: "013で自動化した手順6（CLAUDE.md の生成とコミット）が生成するCLAUDE.mdの本文が英語になる。UI・コメント・ドキュメントをすべて日本語で統一する本アプリの方針に合わせ、日本語で生成されるようにする。"
 

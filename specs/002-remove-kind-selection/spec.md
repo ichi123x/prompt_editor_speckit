@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-08
 
-**Status**: Draft
+**Status**: Implemented
 
 **Input**: User description: "MFCアプリかWEBアプリの選択は機能として不要です。/speckit-constitution を実施したときに判定されることを期待しています。"
 

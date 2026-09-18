@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-13
 
-**Status**: Draft
+**Status**: Implemented
 
 **Input**: User description: "specify CLI導入手順(uv tool install specify-cli)が成功しても、uvはインストール先ディレクトリ(既定では%USERPROFILE%\.local\bin)をPATHへ自動登録しないため、続くSpec Kit足場配置の手順がspecifyコマンドを「見つかりません」として失敗する問題を修正する。uv tool installの成功直後に、uv自身が提供するシェル環境更新の仕組み(uv tool update-shell相当)を実行してPATH登録まで完結させることで、アプリを再起動しなくても後続の手順からspecifyを使えるようにする。"
 

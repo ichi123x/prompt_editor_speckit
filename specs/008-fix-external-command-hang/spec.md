@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-13
 
-**Status**: Draft
+**Status**: Implemented
 
 **Input**: User description: "uvの導入手順(winget install)が対話プロンプト(msstoreソースの利用規約同意)で無期限にハングする不具合を修正する。あわせて、ProcessRunnerの子プロセス監視がReadFileのブロッキングにより実質的にタイムアウトを守れない問題も修正し、外部コマンドが応答を止めた場合に確実にタイムアウトで打ち切れるようにする。"
 
