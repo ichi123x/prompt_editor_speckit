@@ -60,6 +60,46 @@ namespace
 		return false;
 	}
 
+	// folder 自身、またはその配下のサブフォルダにプロジェクトマーカーがあるか。
+	// Visual Studio のウィザードは対象フォルダの直下ではなく、ソリューション名と
+	// 同じサブフォルダにプロジェクト一式を配置することがあるため、直下だけでなく
+	// 配下も再帰的に探索する (017 FR-1701)。種別は区別せず、既存の4条件
+	// (HasFileMatching が直下だけを見るのと同じ集合) のいずれかが見つかればよい
+	// (017 FR-1702)。深さ優先・早期リターンで、最初に見つかった時点で打ち切る。
+	bool HasProjectMarkerRecursive(const CString& folder)
+	{
+		if (HasFileMatching(folder, _T("*.sln"))
+			|| HasFileMatching(folder, _T("*.vcxproj"))
+			|| HasFileMatching(folder, _T("*.csproj"))
+			|| FileExists(CombinePath(folder, _T("package.json"))))
+		{
+			return true;
+		}
+
+		CFileFind finder;
+		BOOL found = finder.FindFile(CombinePath(folder, _T("*")));
+		while (found)
+		{
+			found = finder.FindNextFile();
+			if (finder.IsDirectory() && !finder.IsDots())
+			{
+				// .git の内部は探索しない (017 FR-1703)。Git 自身の内部ファイルに
+				// よる誤検出を避けるため。
+				if (finder.GetFileName().CompareNoCase(_T(".git")) == 0)
+				{
+					continue;
+				}
+				if (HasProjectMarkerRecursive(finder.GetFilePath()))
+				{
+					finder.Close();
+					return true;
+				}
+			}
+		}
+		finder.Close();
+		return false;
+	}
+
 	// 対象フォルダを作業ディレクトリとして git コマンドを実行する。
 	ProcessResult RunGit(const CString& folder, LPCTSTR args)
 	{
@@ -80,15 +120,15 @@ namespace TargetFolder
 			return state;
 		}
 
+		// マーカーがどこで見つかっても、対象フォルダそのものは差し替えない (017 FR-1704)。
+		// 以降の .gitignore 配置・Git 初期化・Spec Kit 足場配置は、常にこの path に対して行う。
 		state.path = NormalizePath(folderPath);
 
-		// プロジェクトマーカーの検出 (002 FR-103)。
-		// 探すファイルの集合は 001 と同じ。種別ごとに分けて保持するのをやめ、
-		// いずれか1つでも見つかれば true とする。
-		state.hasProjectMarker = HasFileMatching(state.path, _T("*.sln"))
-			|| HasFileMatching(state.path, _T("*.vcxproj"))
-			|| HasFileMatching(state.path, _T("*.csproj"))
-			|| FileExists(CombinePath(state.path, _T("package.json")));
+		// プロジェクトマーカーの検出 (002 FR-103、017 FR-1701〜FR-1703)。
+		// 対象フォルダの直下だけでなく、その配下のサブフォルダも探索する。見つからなければ
+		// 従来どおり false のままとなり、「対象のプロジェクトが見つかりません」の表示ロジック
+		// (呼び出し元の MFCApplication1Dlg.cpp) には手を入れない (017 FR-1705)。
+		state.hasProjectMarker = HasProjectMarkerRecursive(state.path);
 
 		// Spec Kit の足場と .gitignore。
 		state.hasSpecifyDir = DirectoryExists(CombinePath(state.path, _T(".specify")));
