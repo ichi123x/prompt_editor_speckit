@@ -1,0 +1,23 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build Debug x64",
+            "type": "process",
+            "command": "C:/Program Files/Microsoft Visual Studio/2022/Professional/MSBuild/Current/Bin/MSBuild.exe",
+            "args": [
+                "${workspaceFolder}/MFCApplication1/MFCApplication1.sln",
+                "/p:Configuration=Debug",
+                "/p:Platform=x64",
+                "/v:minimal",
+                "/nologo",
+                "/property:GenerateFullPaths=true"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": "$msCompile"
+        }
+    ]
+}

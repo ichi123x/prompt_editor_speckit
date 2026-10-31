@@ -1,0 +1,16 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug x64 (MFCApplication1)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/MFCApplication1/x64/Debug/MFCApplication1.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}/MFCApplication1",
+            "stopAtEntry": false,
+            "console": "internalConsole",
+            "preLaunchTask": "Build Debug x64"
+        }
+    ]
+}

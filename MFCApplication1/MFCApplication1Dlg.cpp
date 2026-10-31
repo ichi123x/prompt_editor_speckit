@@ -421,6 +421,31 @@ void CMFCApplication1Dlg::SetControlsEnabled(bool enabled)
 	}
 }
 
+#ifdef	T_CHECK_BUG_01
+//OK, CANCEL, ✖時の動作チェック
+void CMFCApplication1Dlg::OnOK()
+{
+	if (m_running)
+	{
+		AfxMessageBox(_T("導入処理の実行中は閉じられません。完了までお待ちください。"),
+					  MB_OK | MB_ICONINFORMATION);
+		return;
+	}
+	CDialogEx::OnOK();
+}
+
+void CMFCApplication1Dlg::OnCancel()
+{
+	if (m_running)
+	{
+		AfxMessageBox(_T("導入処理の実行中は閉じられません。完了までお待ちください。"),
+					  MB_OK | MB_ICONINFORMATION);
+		return;
+	}
+	CDialogEx::OnCancel();
+}
+#endif
+
 // 「参照...」ボタン (FR-001, FR-002)。
 void CMFCApplication1Dlg::OnBnClickedButtonBrowse()
 {

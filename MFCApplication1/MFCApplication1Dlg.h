@@ -7,6 +7,9 @@
 #include "TargetFolderState.h"
 #include "SetupRunner.h"
 
+//不具合を確認するための定義
+#define T_CHECK_BUG_01		//OK, CANCEL, ✖時のm_runningの状態確認
+
 // ワーカースレッドからダイアログへ進捗を通知するためのメッセージ (research.md R-002)。
 // SendMessage ではなく PostMessage を使い、ワーカーが UI スレッドの応答を待つことによる
 // デッドロックを避ける。
@@ -61,6 +64,10 @@ protected:
 
 	// 生成された、メッセージ割り当て関数
 	virtual BOOL OnInitDialog();
+#ifdef	T_CHECK_BUG_01
+	virtual void OnOK() override;		// OK ボタン押下時の動作を確認するためオーバーライド
+	virtual void OnCancel() override;	// Cancel ボタン押下時の動作を確認する
+#endif
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
 	afx_msg void OnPaint();
 	afx_msg HCURSOR OnQueryDragIcon();
