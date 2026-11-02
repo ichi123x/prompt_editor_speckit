@@ -24,7 +24,7 @@ description: "導入処理の実行中はダイアログを閉じられないよ
 
 **目的**: 実装前の状態を記録する
 
-- [ ] T001 アプリを終了させ（`Get-Process MFCApplication1 -ErrorAction SilentlyContinue | Stop-Process -Force`）、[quickstart.md](./quickstart.md) の ST-1803・ST-1804・ST-1806 を実装前の状態で実行し、いずれも不合格になることを記録する（憲章 原則V「検査そのものが正しく動くことを確かめる」）。期待値: ST-1803 = `T_CHECK_BUG_01` が3件、ST-1804 = `new SetupStep` 1件・`delete step` 1件、ST-1806 = `4つの原則` 1件。あわせて `MFCApplication1/MFCApplication1Dlg.cpp`・`MFCApplication1/MFCApplication1Dlg.h` に `FR-1801`〜`FR-1807` がいずれも0件であることを控える（ST-1802 のベースライン）
+- [X] T001 アプリを終了させ（`Get-Process MFCApplication1 -ErrorAction SilentlyContinue | Stop-Process -Force`）、[quickstart.md](./quickstart.md) の ST-1803・ST-1804・ST-1806 を実装前の状態で実行し、いずれも不合格になることを記録する（憲章 原則V「検査そのものが正しく動くことを確かめる」）。期待値: ST-1803 = `T_CHECK_BUG_01` が3件、ST-1804 = `new SetupStep` 1件・`delete step` 1件、ST-1806 = `4つの原則` 1件。あわせて `MFCApplication1/MFCApplication1Dlg.cpp`・`MFCApplication1/MFCApplication1Dlg.h` に `FR-1801`〜`FR-1807` がいずれも0件であることを控える（ST-1802 のベースライン） — **結果: 合格**（ST-1803=3件、ST-1804=new 1件/delete 1件、ST-1806=1件、FR-1801〜1807はいずれも0件。期待どおり不合格）
 
 ---
 
@@ -44,17 +44,17 @@ description: "導入処理の実行中はダイアログを閉じられないよ
 
 ### User Story 1 の実装
 
-- [ ] T002 [P] [US1] `MFCApplication1/MFCApplication1Dlg.h` から、`//不具合を確認するための定義` のコメント行と `#define T_CHECK_BUG_01 ...` の行（現在の11行目付近）を削除する。`virtual void OnOK() override;` / `virtual void OnCancel() override;` の宣言（現在の67〜70行目付近）を囲む `#ifdef T_CHECK_BUG_01` と `#endif` を削除し、宣言は残す。各宣言の行末コメント（「OK ボタン押下時の動作を確認するためオーバーライド」等）を、`// 018 FR-1801: 実行中は閉じない` のような FR 番号付きの日本語コメントに置き換える。`FR-1805`（実験用の目印を残さず常に有効）にもこのどちらかのコメントで触れる。**`T_CHECK_BUG_01` という文字列はコメントにも残さない**（ST-1803 がコメントも含めて検査するため。[research.md](./research.md) R-1805）
-- [ ] T003 [US1] `MFCApplication1/MFCApplication1Dlg.cpp` の `OnOK()` / `OnCancel()` の定義（現在の424〜447行目付近）を囲む `#ifdef T_CHECK_BUG_01` と `#endif`、および `//OK, CANCEL, ✖時の動作チェック` のコメントを削除する。関数の本体（`m_running` が `true` なら `AfxMessageBox(_T("導入処理の実行中は閉じられません。完了までお待ちください。"), MB_OK | MB_ICONINFORMATION)` を表示して `return`、そうでなければ `CDialogEx::OnOK()` / `CDialogEx::OnCancel()` を呼ぶ）は変更しない。2関数の直前に、閉じる操作がこの2関数に集まること（Enter・Esc・✖・Alt+F4 を含む）と、完了通知の受信で `m_running` が `false` に戻るまでワーカーがダイアログを使っていること（憲章 T-2）を説明する日本語コメントを付け、`FR-1801`・`FR-1802`・`FR-1803`・`FR-1804`・`FR-1805` を記載する。案内表示の3行の重複は共通化しない（R-1802）
-- [ ] T004 [US1] `MFCApplication1/MFCApplication1Dlg.cpp` の手順の結果の受け渡しを憲章 O-3 の方式に書き換える（[research.md](./research.md) R-1804、[data-model.md](./data-model.md) 2）。(1) include 群（現在の18行目 `#include <dwmapi.h>` 付近、`#define new DEBUG_NEW` より前）に `#include <memory>` を追加する。(2) `OnStepFinished`（現在の599〜602行目付近）を、`auto copy = std::make_unique<SetupStep>(step);` で作り、`PostMessage(WM_APP_STEP_FINISHED, 0, reinterpret_cast<LPARAM>(copy.get()))` が成功（非0）したときだけ `copy.release();` する形にする。`release()` の箇所に「所有権は OnStepFinishedMessage へ移った（憲章 O-1 の例外・O-3）」旨のコメントを付ける。失敗時は何もせず自動解放に任せる（FR-1806）。(3) `OnStepFinishedMessage`（現在の604〜615行目付近）の先頭で `std::unique_ptr<SetupStep> step(reinterpret_cast<SetupStep*>(lParam));` と受け取り直し、`delete step;` を削除する（FR-1807）。`step->` による参照箇所はそのまま使える。コメントに `FR-1806`・`FR-1807` を記載する。**`new` を使わない旨の警告コメントは書かない**（ST-1804 はコメント行を除外して検査するが、行末コメントは除外されないため）。T003 と同じファイルのため T003 の後に行う
+- [X] T002 [P] [US1] `MFCApplication1/MFCApplication1Dlg.h` から、`//不具合を確認するための定義` のコメント行と `#define T_CHECK_BUG_01 ...` の行（現在の11行目付近）を削除する。`virtual void OnOK() override;` / `virtual void OnCancel() override;` の宣言（現在の67〜70行目付近）を囲む `#ifdef T_CHECK_BUG_01` と `#endif` を削除し、宣言は残す。各宣言の行末コメント（「OK ボタン押下時の動作を確認するためオーバーライド」等）を、`// 018 FR-1801: 実行中は閉じない` のような FR 番号付きの日本語コメントに置き換える。`FR-1805`（実験用の目印を残さず常に有効）にもこのどちらかのコメントで触れる。**`T_CHECK_BUG_01` という文字列はコメントにも残さない**（ST-1803 がコメントも含めて検査するため。[research.md](./research.md) R-1805） — **結果: 実装済み**（`#define`・`#ifdef`/`#endif` を削除し、宣言に FR-1801・FR-1805 のコメントを付与）
+- [X] T003 [US1] `MFCApplication1/MFCApplication1Dlg.cpp` の `OnOK()` / `OnCancel()` の定義（現在の424〜447行目付近）を囲む `#ifdef T_CHECK_BUG_01` と `#endif`、および `//OK, CANCEL, ✖時の動作チェック` のコメントを削除する。関数の本体（`m_running` が `true` なら `AfxMessageBox(_T("導入処理の実行中は閉じられません。完了までお待ちください。"), MB_OK | MB_ICONINFORMATION)` を表示して `return`、そうでなければ `CDialogEx::OnOK()` / `CDialogEx::OnCancel()` を呼ぶ）は変更しない。2関数の直前に、閉じる操作がこの2関数に集まること（Enter・Esc・✖・Alt+F4 を含む）と、完了通知の受信で `m_running` が `false` に戻るまでワーカーがダイアログを使っていること（憲章 T-2）を説明する日本語コメントを付け、`FR-1801`・`FR-1802`・`FR-1803`・`FR-1804`・`FR-1805` を記載する。案内表示の3行の重複は共通化しない（R-1802） — **結果: 実装済み**（`#ifdef`/`#endif` と実験用コメントを削除。本体は無変更。直前に FR-1801〜1805 と T-2 の説明コメントを付与）
+- [X] T004 [US1] `MFCApplication1/MFCApplication1Dlg.cpp` の手順の結果の受け渡しを憲章 O-3 の方式に書き換える（[research.md](./research.md) R-1804、[data-model.md](./data-model.md) 2）。(1) include 群（現在の18行目 `#include <dwmapi.h>` 付近、`#define new DEBUG_NEW` より前）に `#include <memory>` を追加する。(2) `OnStepFinished`（現在の599〜602行目付近）を、`auto copy = std::make_unique<SetupStep>(step);` で作り、`PostMessage(WM_APP_STEP_FINISHED, 0, reinterpret_cast<LPARAM>(copy.get()))` が成功（非0）したときだけ `copy.release();` する形にする。`release()` の箇所に「所有権は OnStepFinishedMessage へ移った（憲章 O-1 の例外・O-3）」旨のコメントを付ける。失敗時は何もせず自動解放に任せる（FR-1806）。(3) `OnStepFinishedMessage`（現在の604〜615行目付近）の先頭で `std::unique_ptr<SetupStep> step(reinterpret_cast<SetupStep*>(lParam));` と受け取り直し、`delete step;` を削除する（FR-1807）。`step->` による参照箇所はそのまま使える。コメントに `FR-1806`・`FR-1807` を記載する。**`new` を使わない旨の警告コメントは書かない**（ST-1804 はコメント行を除外して検査するが、行末コメントは除外されないため）。T003 と同じファイルのため T003 の後に行う — **結果: 実装済み**（`#include <memory>` を追加。`OnStepFinished` を make_unique + 送信成功時のみ release に、`OnStepFinishedMessage` を先頭で unique_ptr に受け直す形に変更）
 
 ### User Story 1 の検証
 
-- [ ] T005 [US1] [quickstart.md](./quickstart.md) 手順1の**ビルド**（ST-1801）を実施する。Debug/Release × x64/x86 の4構成すべてで警告=0 エラー=0。T002・T003・T004 に依存
-- [ ] T006 [P] [US1] [quickstart.md](./quickstart.md) の **ST-1802**（`FR-1801`〜`FR-1807` がいずれも1件以上出現、コメント行を除外しない）を実施する。T005 に依存
-- [ ] T007 [P] [US1] [quickstart.md](./quickstart.md) の **ST-1803**（`MFCApplication1\*.cpp`・`*.h` に `T_CHECK_BUG_01` が0件、コメントも含める）を実施する。T005 に依存
-- [ ] T008 [P] [US1] [quickstart.md](./quickstart.md) の **ST-1804**（`new SetupStep`・`delete step` が0件、`make_unique<SetupStep>`・`.release()`・`unique_ptr<SetupStep>` が各1件以上、`#include <memory>` あり）を実施し、続けて**目視レビュー**の3点（`release()` が PostMessage 成功時の分岐内にあること、所有者のコメントがあること、受信側が先頭で `unique_ptr` に受け取り直していること）を確認する。T005 に依存
-- [ ] T009 [P] [US1] [quickstart.md](./quickstart.md) の **ST-1805**（案内の文言が `MFCApplication1Dlg.cpp` に2件）を実施する。T005 に依存
+- [X] T005 [US1] [quickstart.md](./quickstart.md) 手順1の**ビルド**（ST-1801）を実施する。Debug/Release × x64/x86 の4構成すべてで警告=0 エラー=0。T002・T003・T004 に依存 — **結果: 合格**（4構成すべて警告0・エラー0）
+- [X] T006 [P] [US1] [quickstart.md](./quickstart.md) の **ST-1802**（`FR-1801`〜`FR-1807` がいずれも1件以上出現、コメント行を除外しない）を実施する。T005 に依存 — **結果: 合格**（FR-1801=2, FR-1802=1, FR-1803=1, FR-1804=1, FR-1805=2, FR-1806=2, FR-1807=2）
+- [X] T007 [P] [US1] [quickstart.md](./quickstart.md) の **ST-1803**（`MFCApplication1\*.cpp`・`*.h` に `T_CHECK_BUG_01` が0件、コメントも含める）を実施する。T005 に依存 — **結果: 合格**（0件）
+- [X] T008 [P] [US1] [quickstart.md](./quickstart.md) の **ST-1804**（`new SetupStep`・`delete step` が0件、`make_unique<SetupStep>`・`.release()`・`unique_ptr<SetupStep>` が各1件以上、`#include <memory>` あり）を実施し、続けて**目視レビュー**の3点（`release()` が PostMessage 成功時の分岐内にあること、所有者のコメントがあること、受信側が先頭で `unique_ptr` に受け取り直していること）を確認する。T005 に依存 — **結果: 合格**（new SetupStep=0, delete step=0, make_unique=1, release()=1, unique_ptr受取=1, #include <memory> は22行目。目視レビュー3点も合格）
+- [X] T009 [P] [US1] [quickstart.md](./quickstart.md) の **ST-1805**（案内の文言が `MFCApplication1Dlg.cpp` に2件）を実施する。T005 に依存 — **結果: 合格**（2件）
 - [ ] T010 [US1] [quickstart.md](./quickstart.md) 手順4の **DT-1801**（実行中に「キャンセル」「OK」✖・Esc・Alt+F4・Enter の6操作を試し、それぞれ案内が表示されること・ダイアログが閉じないこと・手順の追加が続くことを確認し、完了後に ✖ で閉じられることを確認する）を**利用者が実機で実施する**。フォルダ選択ダイアログの自動操作ができないため、エージェントは手順を案内して結果の報告を受ける。本フィーチャーの根本価値（FR-1801〜1803、SC-1801）を確かめる唯一の手段のため**必須**。T005 に依存
 
 **チェックポイント**: この時点で、User Story 1 は独立して完全に機能し、テスト可能であるはずです
@@ -73,7 +73,7 @@ description: "導入処理の実行中はダイアログを閉じられないよ
 
 ### User Story 2 の検証
 
-- [ ] T011 [US2] [quickstart.md](./quickstart.md) 手順3の **DT-1802** を自動で実施する。ケース1〜3は起動直後のアプリへ `WM_COMMAND(IDOK)`・`WM_COMMAND(IDCANCEL)`・`WM_SYSCOMMAND(SC_CLOSE)` を1ケースずつ送る（User Story 2 シナリオ1）。ケース4はフォルダ未選択のまま「生成」（`IDC_BUTTON_GENERATE` = 1004）を送って検証で中止させ、表示された案内を `WM_CLOSE` で閉じてから `WM_COMMAND(IDCANCEL)` を送る（シナリオ3。案内は `WM_COMMAND(IDOK)` では閉じないことを実測済み）。4ケースすべてで3秒以内にプロセスが終了し、ケース4で案内ボックスが1つ検出されること（FR-1804、SC-1802）。完了後に閉じられること（シナリオ2）は T010 の手順5で確認する。T005 に依存
+- [X] T011 [US2] [quickstart.md](./quickstart.md) 手順3の **DT-1802** を自動で実施する。ケース1〜3は起動直後のアプリへ `WM_COMMAND(IDOK)`・`WM_COMMAND(IDCANCEL)`・`WM_SYSCOMMAND(SC_CLOSE)` を1ケースずつ送る（User Story 2 シナリオ1）。ケース4はフォルダ未選択のまま「生成」（`IDC_BUTTON_GENERATE` = 1004）を送って検証で中止させ、表示された案内を `WM_CLOSE` で閉じてから `WM_COMMAND(IDCANCEL)` を送る（シナリオ3。案内は `WM_COMMAND(IDOK)` では閉じないことを実測済み）。4ケースすべてで3秒以内にプロセスが終了し、ケース4で案内ボックスが1つ検出されること（FR-1804、SC-1802）。完了後に閉じられること（シナリオ2）は T010 の手順5で確認する。T005 に依存 — **結果: 合格**（4ケースとも閉じた=True。ケース4は案内ボックス数=1、閉じた後の残り=0）
 
 **チェックポイント**: ここまでで US1・US2 の両方が独立して機能する。実行中は閉じず、待機中は閉じることが実測で確認できる
 
@@ -81,7 +81,7 @@ description: "導入処理の実行中はダイアログを閉じられないよ
 
 ## Phase 5: Polish & Cross-Cutting Concerns（仕上げと横断的関心事）
 
-- [ ] T012 [P] [quickstart.md](./quickstart.md) 付録の**コード分析**（`RunCodeAnalysis=true` / `EnablePREfast=true`）を実施し、指摘が0件であること（憲章の技術的制約）。T005 に依存
+- [X] T012 [P] [quickstart.md](./quickstart.md) 付録の**コード分析**（`RunCodeAnalysis=true` / `EnablePREfast=true`）を実施し、指摘が0件であること（憲章の技術的制約）。T005 に依存 — **結果: 合格**（指摘0件）
 - [ ] T013 `CLAUDE.md` を3か所更新する（[research.md](./research.md) R-1805）。(1)「既存機能」の表の末尾に `specs/018-block-close-while-running/` の行を追加する（内容: 導入処理の実行中は OK・キャンセル・✖ 等でダイアログを閉じられないようにした。コミット `1d49765` の先行修正を憲章 T-2 に基づき正式化。あわせて手順の結果の受け渡しを憲章 O-3 の `unique_ptr` + `release()` 方式に変更）。(2)「憲章」節の「（v1.0.0）」を「（v1.5.0）」にし、「4つの原則: …」の行を、原則 I〜V と「所有権・スレッドモデル」節（O-1〜O-3、T-1〜T-4）がある旨の記述に置き換える。(3)「設計上、壊しやすい箇所」節に1項目を追加する（`OnOK` / `OnCancel` は `m_running` が `true` の間は閉じない。Enter・Esc・✖・Alt+F4 もすべてこの2関数を通る。この判定を外すと、ワーカーが通知している最中にダイアログが破棄される T-2 違反に戻る。実行中も「OK」「キャンセル」ボタンは無効化しない設計であり、「処理中は2コントロールを無効化する」の項目と矛盾しない）。**T010（DT-1801）が不合格の場合はこのタスクを実施しない**（効果が確認できていない知見を書き残さない）。T010・T011 に依存
 - [ ] T014 [quickstart.md](./quickstart.md) の **ST-1806**（CLAUDE.md に `018-block-close-while-running` と `v1.5.0` があり、`4つの原則` と `v1.0.0` が無い）を実施する。T013 に依存
 - [ ] T015 `specs/018-block-close-while-running/spec.md` 冒頭の `**Status**` を `Draft` から `Implemented` に更新する（憲章「開発ワークフロー」）。必須タスク（T001〜T014、すべて必須）が `[X]` になっていることを確認してから行う。T014 に依存

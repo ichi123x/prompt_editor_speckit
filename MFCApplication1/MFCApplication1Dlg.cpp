@@ -18,6 +18,9 @@
 #include <dwmapi.h>
 #pragma comment(lib, "dwmapi.lib")
 
+// 018 FR-1806, FR-1807: 手順の結果の受け渡しに std::unique_ptr / std::make_unique を使う。
+#include <memory>
+
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
@@ -421,8 +424,13 @@ void CMFCApplication1Dlg::SetControlsEnabled(bool enabled)
 	}
 }
 
-#ifdef	T_CHECK_BUG_01
-//OK, CANCEL, ✖時の動作チェック
+// 018 FR-1801〜FR-1805 (憲章 T-2): 導入処理の実行中はダイアログを閉じない。
+// 閉じる操作はすべてこの2関数に集まる。Enter は OnOK、Esc・✖・Alt+F4・システムメニューの
+// 「閉じる」は WM_CLOSE → IDCANCEL を経て OnCancel に届く (research.md R-1801)。
+// FR-1802: 閉じなかったときは理由を案内する。
+// ワーカーは WM_APP_SETUP_COMPLETED を送るまでダイアログ (this) を使っている。その受信で
+// m_running が false に戻るまで閉じると、破棄済みのダイアログへ通知が届くことになる。
+// 閉じなかった場合も導入処理は中断しない (FR-1803)。待機中は従来どおり閉じる (FR-1804)。
 void CMFCApplication1Dlg::OnOK()
 {
 	if (m_running)
@@ -444,7 +452,6 @@ void CMFCApplication1Dlg::OnCancel()
 	}
 	CDialogEx::OnCancel();
 }
-#endif
 
 // 「参照...」ボタン (FR-001, FR-002)。
 void CMFCApplication1Dlg::OnBnClickedButtonBrowse()
@@ -596,20 +603,29 @@ UINT AFX_CDECL CMFCApplication1Dlg::SetupThreadProc(LPVOID param)
 
 // ISetupProgressSink: ワーカースレッドから呼ばれる。
 // UI を直接操作せず PostMessage で UI スレッドへ渡す (research.md R-002)。
+// 018 FR-1806 (憲章 O-3): 結果のコピーは unique_ptr で作り、送信に成功したときだけ手放す。
+// 送信に失敗した場合 (送り先のウィンドウが無い等) は、関数を抜けるときに自動で解放される。
 void CMFCApplication1Dlg::OnStepFinished(const SetupStep& step)
 {
-	PostMessage(WM_APP_STEP_FINISHED, 0, reinterpret_cast<LPARAM>(new SetupStep(step)));
+	auto copy = std::make_unique<SetupStep>(step);
+	if (PostMessage(WM_APP_STEP_FINISHED, 0, reinterpret_cast<LPARAM>(copy.get())))
+	{
+		// 所有権は OnStepFinishedMessage へ移った。受け取り側が unique_ptr で受け直すまでの間は
+		// メッセージが所有者となる (憲章 O-1 の例外、O-3)。
+		copy.release();
+	}
 }
 
+// 018 FR-1807 (憲章 O-3): lParam の所有者はこの関数。直ちに unique_ptr で受け直し、
+// 関数を抜けるときに自動で解放する。
 LRESULT CMFCApplication1Dlg::OnStepFinishedMessage(WPARAM, LPARAM lParam)
 {
-	SetupStep* step = reinterpret_cast<SetupStep*>(lParam);
+	std::unique_ptr<SetupStep> step(reinterpret_cast<SetupStep*>(lParam));
 	if (step != nullptr)
 	{
 		AppendResultRow(step->displayName,
 						SetupRunner::ResultDisplayName(step->result),
 						step->reason);
-		delete step;
 	}
 	return 0;
 }
