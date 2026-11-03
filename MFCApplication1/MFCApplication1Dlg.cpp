@@ -580,6 +580,11 @@ void CMFCApplication1Dlg::OnBnClickedButtonGenerate()
 
 	m_running = true;
 	SetControlsEnabled(false);
+	// 018 FR-1808: 押されたばかりの「生成」にフォーカスが残ったまま無効化されると、フォーカスが
+	// どこにも無くなり Esc・Enter がダイアログに届かない (Alt+F4 だけはシステムキーなので届く)。
+	// 実行中も有効な結果一覧へ移しておく。結果一覧は Esc・Enter を自分では受け取らないため、
+	// それぞれキャンセル・OK へ回る (research.md R-1806)。
+	GotoDlgCtrl(&m_listResult);
 
 	if (AfxBeginThread(SetupThreadProc, this) == nullptr)
 	{

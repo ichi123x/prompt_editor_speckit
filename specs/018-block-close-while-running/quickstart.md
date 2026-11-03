@@ -46,10 +46,10 @@ FR 番号はコメントとして記載する設計のため、この検査は**
 
 ```powershell
 $text = (Get-Content MFCApplication1\MFCApplication1Dlg.cpp -Raw) + (Get-Content MFCApplication1\MFCApplication1Dlg.h -Raw)
-1801..1807 | ForEach-Object { $n = "FR-$_"; "{0}: {1}" -f $n, ([regex]::Matches($text, $n)).Count }
+1801..1808 | ForEach-Object { $n = "FR-$_"; "{0}: {1}" -f $n, ([regex]::Matches($text, $n)).Count }
 ```
 
-**合格条件**: FR-1801〜1807 がいずれも1件以上出現すること。
+**合格条件**: FR-1801〜1808 がいずれも1件以上出現すること。
 
 ### ST-1803: 実験用の目印が残っていないこと（FR-1805）
 
@@ -172,11 +172,44 @@ foreach ($c in $cases) {
 
 ---
 
+## 手順3b: DT-1803（結果一覧にフォーカスがあれば Esc・Enter が届くこと、完全自動）
+
+FR-1808 の前提（[research.md](./research.md) R-1806）を確かめる。起動直後のアプリで、結果一覧へ
+`WM_KEYDOWN` を直接送る。結果一覧が Enter・Esc を自分で受け取らない部品であれば、ダイアログマネージャが
+それぞれ OK・キャンセルへ回し、待機中なのでダイアログが閉じる。
+
+```powershell
+Add-Type -Namespace K -Name U -MemberDefinition @'
+[DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
+[DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr h, int id);
+[DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
+'@
+$id = (Select-String -Path MFCApplication1\Resource.h -Pattern 'IDC_LIST_RESULT\s+(\d+)').Matches[0].Groups[1].Value
+foreach ($k in @(@{n='Enter';vk=0x0D}, @{n='Esc';vk=0x1B})) {
+  $p = Start-Process MFCApplication1\x64\Debug\MFCApplication1.exe -PassThru
+  $null = $p.WaitForInputIdle(5000); Start-Sleep -Milliseconds 500; $p.Refresh()
+  $list = [K.U]::GetDlgItem($p.MainWindowHandle, [int]$id)
+  $code = [K.U]::SendMessage($list, 0x0087, [IntPtr]$k.vk, [IntPtr]::Zero)          # WM_GETDLGCODE
+  [K.U]::PostMessage($list, 0x0100, [IntPtr]$k.vk, [IntPtr]::Zero) | Out-Null        # WM_KEYDOWN
+  [K.U]::PostMessage($list, 0x0101, [IntPtr]$k.vk, [IntPtr]0xC0000001) | Out-Null   # WM_KEYUP
+  "{0}: WM_GETDLGCODE=0x{1:X} 閉じた={2}" -f $k.n, $code.ToInt64(), $p.WaitForExit(3000)
+  if (-not $p.HasExited) { $p | Stop-Process -Force }
+}
+```
+
+**合格条件**: Enter・Esc の両方で `閉じた=True`。`WM_GETDLGCODE` に `DLGC_WANTALLKEYS`（0x4）が含まれない
+こと（2026-11-03 の実測値は `0x81`）。
+
+**この検査の限界**: 「生成」を押した後に実際にフォーカスが結果一覧へ移ることは、フォルダ選択を伴うため
+自動化できない。それは DT-1801 の Esc・Enter の項目（利用者の実機確認）で確かめる。
+
+---
+
 ## 手順4: DT-1801（実行中は閉じられないこと、利用者による実機実行が必須）
 
 導入処理の手順6（CLAUDE.md の生成）は 30〜60 秒程度かかるため、その間に操作するとよい。
 
-1. `MFCApplication1\x64\Debug\MFCApplication1.exe` を起動し、「参照...」で `C:\work\test\test01` を選ぶ。
+1. `MFCApplication1\x64\Debug\MFCApplication1.exe` を起動し、「参照...」で `C:\work\claude\test\test01` を選ぶ。
 2. 「生成」を押す。結果一覧に手順が並び始め、案内欄が「導入処理を実行しています...」になったことを確認する。
 3. 完了する前に、次の操作を1つずつ行い、そのたびに確認する。
    - 「キャンセル」を押す
@@ -197,6 +230,13 @@ foreach ($c in $cases) {
    完了した場合」）。
 
 **合格条件**: 手順3の6操作すべてで (a)〜(c) を満たし、手順5でダイアログが閉じること。手順6は任意。
+Esc・Enter は、「生成」を押した後に**画面のどこもクリックせずに**押すこと（クリックするとフォーカスが
+戻り、FR-1808 の確認にならない）。手順5も、クリックせずに Esc で閉じられることを追加で確かめる。
+
+**注意**: test01 のように既に SDD 化したフォルダでは、6手順すべてが「導入済み」で数秒のうちに終わる。
+閉じる操作が実行中に間に合わず、正しく閉じてしまったのを「不合格」と誤認しやすい（2026-11-03 に実際に
+起きた）。`.sln` だけを置いた新しいフォルダ（例: `C:\work\claude\test\test02`）を使うと、手順6だけで
+30〜60 秒かかる。
 
 **手順3に含めない閉じる操作について**: システムメニュー（タイトルバー左端のアイコン、または Alt+Space）の
 「閉じる」と、タスクバーのウィンドウ一覧からの「ウィンドウを閉じる」は、✖・Alt+F4 と同じ
@@ -213,6 +253,7 @@ foreach ($c in $cases) {
 - [ ] ST-1801: 4構成のビルドで警告0・エラー0、コード分析の指摘0
 - [ ] ST-1802〜1806 がすべて合格（ST-1804 の目視レビューを含む）
 - [ ] DT-1802（自動）が4ケースすべて合格
+- [ ] DT-1803（自動）が Enter・Esc の両方で合格
 - [ ] DT-1801（利用者による実機実行）が合格
 
 ---
